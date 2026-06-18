@@ -260,7 +260,7 @@ const Orders = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab("unpaid")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all${
                 activeTab === "unpaid"
                   ? "bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-500"
@@ -279,7 +279,7 @@ const Orders = () => {
             </button>
             <button
               onClick={() => setActiveTab("paid")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all${
                 activeTab === "paid"
                   ? "bg-success-100 dark:bg-success-900 text-success-700 dark:text-success-300"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-500"
@@ -298,15 +298,15 @@ const Orders = () => {
             </button>
             <button
               onClick={() => setActiveTab("debt")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              className={`flex-1 py-2.5 px-0.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 activeTab === "debt"
                   ? "bg-warning-100 dark:bg-warning-900 text-warning-700 dark:text-warning-300"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-500"
               }`}
             >
-              Nasiyalar
+              Nasiyalar{" "}
               <span
-                className={`px-1.5 py-0.5 rounded-full text-xs font-extrabold ${
+                className={`px-1.5 py-0.5 rounded-full   font-extrabold ${
                   activeTab === "debt"
                     ? "bg-warning-600 text-white"
                     : "bg-gray-200 dark:bg-gray-600 text-gray-500"
@@ -342,7 +342,7 @@ const Orders = () => {
             {activeTab === "debt"
               ? "Nasiyalar yo'q"
               : activeTab === "unpaid"
-                ? `Assalomu aleykum, ${todayDateStr} uchun buyurtmalar yo'q, iltimos buyurtma qo'shing`
+                ? `Assalomu aleykum, ${todayDateStr} uchun to'lanmangan buyurtmalar yo'q, iltimos buyurtma qo'shing`
                 : `${todayDateStr} uchun to'langan buyurtmalar yo'q`}
           </div>
         ) : (

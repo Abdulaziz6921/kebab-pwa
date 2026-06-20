@@ -66,29 +66,41 @@ function HBar({ label, value, max, color, unit = "ta" }) {
 // ─── Vertical revenue bar chart ───────────────────────────────────────────────
 function RevenueBarChart({ data, label }) {
   if (!data.length) return null;
+
+  // 🌟 Ustunlar ko'p bo'lsa (Soatlik/Oylikda > 12) grafikni balandroq qilamiz,
+  // bu raqamlar ustma-ust tushib ketishining oldini oladi
+  const isLarge = data.length > 12;
+  const maxPx = isLarge ? 140 : 96; // 96px dan 140px ga balandlashdi
+
   const maxVal = Math.max(...data.map((d) => d.value), 1);
-  const maxPx = 96; // chart height in px
   const today = dayStart(Date.now());
 
   return (
     <div>
       <div
-        className="flex items-end gap-0.5 overflow-x-auto pb-2"
-        style={{ height: maxPx + 45 }}
+        className="flex items-end gap-0.5 overflow-x-auto pb-2 scrollbar-none"
+        style={{ height: maxPx + 55 }} // Vertikal joyni kengaytirdik
       >
         {data.map((d, i) => {
           const h = Math.max((d.value / maxVal) * maxPx, d.value > 0 ? 5 : 2);
           const isTdy = d.dayTs === today;
+
           return (
             <div
               key={i}
               className="flex flex-col items-center justify-end gap-1 shrink-0"
-              style={{ flex: 1, minWidth: data.length > 20 ? 14 : 28 }}
+              // 🌟 Ustunlar ko'p bo'lsa eng kichik kenglikni siqib qo'ymaymiz (minimal joy qoldiramiz)
+              style={{ flex: 1, minWidth: isLarge ? 20 : 25 }}
             >
               {d.value > 0 && (
                 <span
-                  className={`font-semibold text-gray-500 leading-none whitespace-nowrap  ${
-                    data.length > 20 ? "text-[12px]" : "text-[14px]"
+                  // 🌟 Raqamlar yopishib ketmasligi uchun matn o'lchamini soatlikda text-[9px] qildik
+                  className={`font-semibold text-gray-500 leading-none whitespace-nowrap mb-0.5 tracking-tighter ${
+                    data.length > 20
+                      ? "text-[9px]"
+                      : isLarge
+                        ? "text-[11px]"
+                        : "text-[13px]"
                   }`}
                 >
                   {formatRevenue(d.value)}
@@ -96,7 +108,7 @@ function RevenueBarChart({ data, label }) {
               )}
 
               <div
-                className="w-full rounded-t-md transition-all duration-500"
+                className="w-full rounded-t-sm transition-all duration-500"
                 style={{
                   height: h,
                   background: isTdy
@@ -110,8 +122,8 @@ function RevenueBarChart({ data, label }) {
 
               {d.label && (
                 <span
-                  className={`text-center text-gray-400 leading-none ${
-                    data.length > 20 ? "text-[7px]" : "text-[9px]"
+                  className={`text-center text-gray-400 leading-none mt-1 ${
+                    data.length > 20 ? "text-[8px]" : "text-[10px]"
                   } ${isTdy ? "font-bold text-primary-500" : ""}`}
                 >
                   {d.label}
@@ -168,7 +180,7 @@ const KEBAB_CONFIG = [
   { id: "quy", label: "Qo'y go'shti", color: "#10b981" },
 ];
 
-const DAY_SHORT = ["Ya", "Du", "Se", "Ch", "Pa", "Ju", "Sh"];
+const DAY_SHORT = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
 
 function getDayLabel(ts) {
   const d = new Date(ts);
@@ -203,17 +215,46 @@ const Statistics = () => {
 
   // ── Key metrics ───────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
+    // 1. Bugungi kunni tekshirish uchun helper (agar kerak bo'lsa)
+    const isToday = (date) => {
+      const d = new Date(date);
+      const today = new Date();
+      return (
+        d.getDate() === today.getDate() &&
+        d.getMonth() === today.getMonth() &&
+        d.getFullYear() === today.getFullYear()
+      );
+    };
+
+    // 2. Buyurtmalarni statuslariga ko'ra ajratamiz
     const paid = periodOrders.filter((o) => o.paid);
-    const unpaid = periodOrders.filter((o) => !o.paid);
+
+    // Bugungi to'lanmagan va nasiya bo'lmaganlar (Kutilmoqda)
+    const pendingOrders = periodOrders.filter(
+      (o) => !o.paid && isToday(o.createdAt) && !o.isDebt,
+    );
+
+    // Jami nasiya buyurtmalar
+    const debtOrders = periodOrders.filter(
+      (o) => o.isDebt || (!o.paid && !isToday(o.createdAt)),
+    );
+
+    // 3. Pullarni (Summalarni) hisoblaymiz
     const revenue = paid.reduce((s, o) => s + (o.totalPrice || 0), 0);
-    const pendingRev = unpaid.reduce((s, o) => s + (o.totalPrice || 0), 0);
+    const pendingRev = pendingOrders.reduce(
+      (s, o) => s + (o.totalPrice || 0),
+      0,
+    );
+    const debtTotal = debtOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
     return {
       revenue,
       pendingRev,
+      debtTotal, // Nasiyadagi jami pul summasi
       total: periodOrders.length,
       paid: paid.length,
-      unpaid: unpaid.length,
+      pendingCount: pendingOrders.length, // Bugungi kutilayotgan buyurtmalar soni
+      debtCount: debtOrders.length, // Jami nasiya buyurtmalar soni
       avgRev: paid.length > 0 ? Math.round(revenue / paid.length) : 0,
     };
   }, [periodOrders]);
@@ -329,7 +370,7 @@ const Statistics = () => {
           <MetricCard
             label="Kutilmoqda"
             value={formatCurrency(metrics.pendingRev)}
-            sub={`${metrics.unpaid} ta buyurtma`}
+            sub={`${metrics.pendingCount} ta to'lanmagan`} // 🌟 "unpaid" o'rniga "pendingCount" ulandi
           />
           <MetricCard
             label="Jami buyurtma"
@@ -337,31 +378,13 @@ const Statistics = () => {
             sub={`${metrics.paid} to'langan`}
           />
           <MetricCard
-            label="To'lanmagan"
-            value={metrics.unpaid}
-            sub={
-              metrics.total > 0
-                ? `${Math.round((metrics.unpaid / metrics.total) * 100)}%`
-                : "0%"
-            }
+            label="Nasiyalar"
+            value={formatCurrency(metrics.debtTotal)} // 🌟 Nasiya bo'lib turgan jami pul miqdori
+            sub={`${metrics.debtCount} ta buyurtma nasiya`} // 🌟 Nasiya buyurtmalar soni
           />
         </div>
 
-        {/* ── Revenue bar chart ────────────────────────────────────────── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
-          <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
-            {barChartLabel}
-          </h3>
-          {periodOrders.filter((o) => o.paid).length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">
-              Hali daromad yo'q
-            </p>
-          ) : (
-            <RevenueBarChart data={barData} />
-          )}
-        </div>
-
-        {/* ── Kebab type breakdown ─────────────────────────────────────── */}
+        {/* ── Kebab quantity revenue breakdown ─────────────────────────────────────── */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
           <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
             Shashlik miqdori bo'yicha taqsimot
@@ -385,43 +408,7 @@ const Statistics = () => {
           )}
         </div>
 
-        {/* ── Paid / Unpaid donut ──────────────────────────────────────── */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
-          <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
-            To'lov holati
-          </h3>
-          <div className="flex items-center justify-between">
-            <DonutChart paid={metrics.paid} total={metrics.total} size={148} />
-            <div className="flex-1 pl-6 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-success-400 shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500">To'langan</p>
-                  <p className="text-lg font-extrabold text-navy-900 dark:text-white leading-none mt-0.5">
-                    {metrics.paid}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-orange-300 shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500">To'lanmagan</p>
-                  <p className="text-lg font-extrabold text-navy-900 dark:text-white leading-none mt-0.5">
-                    {metrics.unpaid}
-                  </p>
-                </div>
-              </div>
-              <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
-                <p className="text-xs text-gray-500">Jami buyurtma</p>
-                <p className="text-base font-extrabold text-navy-900 dark:text-white">
-                  {metrics.total}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Additional kebab revenue breakdown ──────────────────────── */}
+        {/* ── Kebab type revenue breakdown ──────────────────────── */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
           <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-3">
             Daromad - shashlik turi bo'yicha
@@ -456,27 +443,88 @@ const Statistics = () => {
                 .reduce((s, o) => s + (o.totalPrice || 0), 0);
               const pct = total > 0 ? (rev / total) * 100 : 0;
               return (
-                <div key={k.id} className="flex items-center gap-3">
-                  <div
-                    className="w-3 h-3 rounded-full shrink-0"
-                    style={{ background: k.color }}
-                  />
-                  <span className="text-sm text-gray-600 dark:text-gray-400 w-28 shrink-0">
-                    {k.label}
-                  </span>
-                  <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${pct}%`, background: k.color }}
-                    />
+                <div key={k.id} className="flex flex-col gap-0.5">
+                  <div className="flex justify-end">
+                    <span className="text-xs font-bold text-navy-800 dark:text-gray-100 whitespace-nowrap">
+                      {formatCurrency(rev)}
+                    </span>
                   </div>
-                  <span className="text-xs font-bold text-navy-800 dark:text-gray-300 w-20 text-right whitespace-nowrap ">
-                    {formatCurrency(rev)}
-                  </span>
+
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: k.color }}
+                    />
+                    <span className="text-sm text-gray-600 dark:text-white w-28 shrink-0">
+                      {k.label}
+                    </span>
+                    <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${pct}%`,
+                          background: k.color,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
+        </div>
+        {/* ── Paid / Debt donut ──────────────────────────────────────── */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
+          <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
+            To'lov holati
+          </h3>
+          <div className="flex items-center justify-between">
+            <DonutChart paid={metrics.paid} total={metrics.total} size={148} />
+            <div className="flex-1 pl-6 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-success-400 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500">To'langan</p>
+                  <p className="text-lg font-extrabold text-navy-900 dark:text-white leading-none mt-0.5">
+                    {metrics.paid}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-orange-300 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500">Nasiyalar</p>
+                  <p className="text-lg font-extrabold text-navy-900 dark:text-white leading-none mt-0.5">
+                    {metrics.isDebt}
+                  </p>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+                <p className="text-xs text-gray-500">Jami buyurtma</p>
+                <p className="text-base font-extrabold text-navy-900 dark:text-white">
+                  {metrics.total}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* ── Revenue bar chart ────────────────────────────────────────── */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
+          <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
+            {barChartLabel}
+          </h3>
+          {periodOrders.filter((o) => o.paid).length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-6">
+              Hali daromad yo'q
+            </p>
+          ) : (
+            /* 🌟 MUHIM TUZATISH: Mobil uchun skrol va dinamik kenglik qo'shildi */
+            <div className="w-full overflow-x-auto scrollbar-none">
+              <div className={"w-full"}>
+                <RevenueBarChart data={barData} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

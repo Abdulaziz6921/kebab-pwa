@@ -29,6 +29,10 @@ export const router = createBrowserRouter([
         element: <NewOrder />,
       },
       {
+        path: "edit-order/:id",
+        element: <NewOrder />,
+      },
+      {
         path: "history",
         element: <History />,
       },

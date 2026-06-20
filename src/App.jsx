@@ -1,9 +1,8 @@
 import { Outlet } from "react-router-dom";
 import { BottomNav, SyncIndicator } from "./components";
-import { AuthProvider, useAuth } from "./contexts/AuthContext"; // To'g'ri yo'lni yozing
+import { useAuth } from "./contexts/AuthContext"; // AuthProvider importi olib tashlandi
 import AuthPage from "./pages/AuthPage";
 
-// 1. Himoya qatlamini alohida komponentga olamiz
 function ProjectLayout() {
   const { user } = useAuth();
 
@@ -24,13 +23,9 @@ function ProjectLayout() {
   );
 }
 
-// 2. Asosiy App komponenti context provayder bilan o'raladi
+// 🌟 TUZATISH: Ortiqcha ichki AuthProvider olib tashlandi
 function App() {
-  return (
-    <AuthProvider>
-      <ProjectLayout />
-    </AuthProvider>
-  );
+  return <ProjectLayout />;
 }
 
 export default App;

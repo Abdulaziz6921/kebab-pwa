@@ -1,14 +1,31 @@
-import { useState } from "react";
-import { useAuth } from "../contexts"; 
-import { LogIn, Mail, Lock, AlertCircle, EyeOff, Eye } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "../contexts";
+import {
+  LogIn,
+  Mail,
+  Lock,
+  AlertCircle,
+  EyeOff,
+  Eye,
+  Loader2,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function AuthPage() {
   const { login } = useAuth();
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsInitializing(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [firebaseError, setFirebaseError] = useState("");
+  const navigate = useNavigate();
 
   const validateForm = () => {
     const tempErrors = {};
@@ -30,8 +47,15 @@ export default function AuthPage() {
 
     if (!validateForm()) return;
 
+    setIsSubmitting(true);
     try {
       await login(email, password);
+
+      // 🌟 ENGI MUHIM TUZATISH: Login muvaffaqiyatli bo'lishi bilan
+      // foydalanuvchini darhol asosiy sahifaga yo'naltiramiz!
+      setTimeout(() => {
+        navigate("/");
+      }, 900);
     } catch (err) {
       console.error(err.code);
       if (
@@ -41,11 +65,23 @@ export default function AuthPage() {
       ) {
         setFirebaseError("Email yoki parol noto'g'ri. Kirish taqiqlangan.");
       } else {
-        setFirebaseError("Tizimga ulanishda xatolik yuz berdi.");
+        setFirebaseError(
+          "Tizimga ulanishda xatolik yuz berdi. Internetni tekshiring.",
+        );
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
+        <p className="text-xs text-gray-400 mt-2">Tizim yuklanmoqda...</p>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 select-none">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
@@ -126,8 +162,17 @@ export default function AuthPage() {
             type="submit"
             className="w-full flex items-center justify-center gap-2 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-md transition-colors mt-6"
           >
-            <LogIn className="w-4 h-4" />
-            Tizimga kirish
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Tekshirilmoqda...
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                Tizimga kirish
+              </>
+            )}
           </button>
         </form>
       </div>

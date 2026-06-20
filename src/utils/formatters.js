@@ -11,11 +11,19 @@ export const formatCurrency = (amount, currency = "UZS", locale = "uz-UZ") => {
 };
 // Format revenue (short version, e.g., 1.2M, 3.4k)
 export const formatRevenue = (n) => {
-  return n >= 1000000
-    ? `${(n / 1000000).toFixed(1)}M`
-    : n >= 1000
-      ? `${(n / 1000).toFixed(1)}k`
-      : n.toString();
+  if (n >= 1000000) {
+    const formatted = n / 1000000;
+    // Agar butun son bo'lsa (Formatted % 1 === 0), kasrsiz ko'rsatadi, aks holda 1 ta kasr qoldiradi
+    return (formatted % 1 === 0 ? formatted : formatted.toFixed(1)) + "M";
+  }
+
+  if (n >= 1000) {
+    const formatted = n / 1000;
+    // Agar butun son bo'lsa kasrsiz, aks holda 1 ta kasr qoldiradi
+    return (formatted % 1 === 0 ? formatted : formatted.toFixed(1)) + "k";
+  }
+
+  return n.toString();
 };
 
 // Format currency short (just number)

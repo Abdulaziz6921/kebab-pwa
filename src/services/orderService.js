@@ -52,6 +52,7 @@ export const orderService = {
       createdAt: timestamp,
       updatedAt: timestamp,
       paidAt: null,
+      isDebt: orderData.isDebt || false,
     };
 
     // STEP 1: Write to IndexedDB — guaranteed, no network needed
@@ -66,20 +67,51 @@ export const orderService = {
     return order; // returns immediately after IndexedDB write
   },
 
-  // ── Update ─────────────────────────────────────────────────────────────────
+  // ── Update ──────────────────────────────────────────────────────────────
   async update(id, updates) {
     const existing = await orderDB.getOrder(id);
     if (!existing) throw new Error(`Order ${id} not found`);
 
+    // 1. O'zgartirib bo'lmaydigan maydonlarni tozalash
     const protectedFields = ["id", "identifier", "createdAt"];
     const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([k]) => !protectedFields.includes(k)),
+      Object.entries(updates || {}).filter(
+        ([k]) => !protectedFields.includes(k),
+      ),
     );
 
-    if (updates.quantity !== undefined || updates.unitPrice !== undefined) {
-      filteredUpdates.totalPrice =
-        (updates.quantity ?? existing.quantity) *
-        (updates.unitPrice ?? existing.unitPrice);
+    // 2. 🌟 ENG ASOSIY TUZATISH: updates va updates.items borligini qat'iy tekshiramiz
+    if (updates && "items" in updates && Array.isArray(updates.items)) {
+      filteredUpdates.items = updates.items;
+
+      if (updates.totalPrice === undefined) {
+        filteredUpdates.totalPrice = updates.items.reduce(
+          (sum, item) =>
+            sum +
+            Number(item.quantity || 0) *
+              Number(item.unitPrice || item.price || 0),
+          0,
+        );
+      }
+
+      if (updates.quantity === undefined) {
+        filteredUpdates.quantity = updates.items.reduce(
+          (sum, item) => sum + Number(item.quantity || 0),
+          0,
+        );
+      }
+    }
+    // 3. Agar items bo'lmasa (To'landi yoki Nasiya qilinganda xatolik bermasligi uchun):
+    else {
+      // items o'zgarmagani uchun filteredUpdates ichidan uni butunlay o'chirib tashlaymiz,
+      // toki orqa fondagi boshqa funksiyalar uni "iterable" (aylanmoqchi) qila olmasin.
+      delete filteredUpdates.items;
+
+      if (updates.quantity !== undefined || updates.unitPrice !== undefined) {
+        filteredUpdates.totalPrice =
+          (updates.quantity ?? existing.quantity) *
+          (updates.unitPrice ?? existing.unitPrice);
+      }
     }
 
     // STEP 1: Write to IndexedDB
@@ -88,6 +120,8 @@ export const orderService = {
       synced: SYNC_STATUS.PENDING,
       updatedAt: Date.now(),
     });
+
+    // Sinxronizatsiya navbatiga ham faqat tozalangan filteredUpdates yuboriladi
     await syncQueueDB.addToQueue(id, "update", { id, ...filteredUpdates });
 
     // STEP 2: Background Firestore sync
@@ -95,7 +129,7 @@ export const orderService = {
       syncInBackground(() => this.syncOrder(id));
     }
 
-    return orderDB.getOrder(id); // reads from IndexedDB
+    return orderDB.getOrder(id);
   },
 
   // ── Mark paid ──────────────────────────────────────────────────────────────
@@ -153,12 +187,15 @@ export const orderService = {
         await orderApi.update(remote.id, {
           description: order.description,
           location: order.location,
-          // kebabType:     order.kebabType,
           quantity: order.quantity,
-          unitPrice: order.unitPrice,
+          unitPrice: order.unitPrice || 0,
           totalPrice: order.totalPrice,
           paid: order.paid,
           paidAt: order.paidAt,
+
+          // ─── 🌟 ENGI MUHIM TUZATISH: isDebt maydonini Firebase-ga yuboramiz ───
+          isDebt: order.isDebt || false,
+
           // Extended fields
           customerName: order.customerName || "",
           customerId: order.customerId || "",
@@ -166,6 +203,17 @@ export const orderService = {
           locationLabel: order.locationLabel || "",
           locationDesc: order.locationDesc || "",
           tavsif: order.tavsif || "",
+
+          // Kechagi tuzatilgan items qismi
+          items:
+            order.items && Array.isArray(order.items)
+              ? order.items.map((item) => ({
+                  kebabType: item.kebabType || "",
+                  kebabName: item.kebabName || "",
+                  quantity: Number(item.quantity || 0),
+                  unitPrice: Number(item.unitPrice || 0),
+                }))
+              : [],
         });
       } else {
         await orderApi.create(order);

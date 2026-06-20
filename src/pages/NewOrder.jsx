@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useOrders, useCustomers, useSettings, useToast } from "../contexts";
 import { generateOrderNumber } from "../utils/helpers";
 import { formatCurrency } from "../utils/formatters";
@@ -132,7 +132,9 @@ const TABS = [
 
 const NewOrder = () => {
   const navigate = useNavigate();
-  const { createOrder, loading } = useOrders();
+  const { id } = useParams();
+  const { createOrder, updateOrder, orders, loading } = useOrders();
+
   const {
     customers,
     addCustomer,
@@ -163,6 +165,66 @@ const NewOrder = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
 
   const [saved, setSaved] = useState(false);
+  const [isDataRestored, setIsDataRestored] = useState(false);
+
+  // 📝 Tahrirlash rejimi uchun eski ma'lumotlarni xavfsiz yuklash logikasi:
+  useEffect(() => {
+    // Agar id bo'lmasa, yoki orders hali yuklanmagan bo'lsa, yoki ma'lumot allaqachon yuklangan bo'lsa - to'xtatamiz
+    if (!id || !orders || orders.length === 0 || isDataRestored) return;
+
+    const orderToEdit = orders.find((o) => o.id === id);
+    if (!orderToEdit) return;
+
+    // 1. Agar mijoz bog'langan bo'lsa
+    if (orderToEdit.customerId || orderToEdit.customerName) {
+      setActiveTab("customers");
+      setSelectedCustomer({
+        id: orderToEdit.customerId,
+        name: orderToEdit.customerName,
+      });
+    }
+    // 2. Agar joylashuv (Location) tanlangan bo'lsa
+    else if (orderToEdit.locationLabel) {
+      setActiveTab("locations");
+      setSelectedLocation({
+        id: orderToEdit.locationId || "",
+        label: orderToEdit.locationLabel,
+        desc: orderToEdit.locationDesc,
+        type: orderToEdit.locationType,
+      });
+    }
+    // 3. Agar faqat tavsif (Noma'lum) yozilgan bo'lsa
+    else if (orderToEdit.tavsif || orderToEdit.description) {
+      setActiveTab("tavsif");
+      setTavsif(orderToEdit.tavsif || orderToEdit.description);
+    }
+
+    // 4. Kabob mahsulotlarini qayta tiklash
+    if (orderToEdit.items && orderToEdit.items.length > 0) {
+      const restoredItems = orderToEdit.items.map((item) => {
+        const kebabConfig = KEBAB_TYPES.find(
+          (k) => k.id === item.kebabType || k.name === item.kebabName,
+        );
+        return {
+          kebab: kebabConfig || {
+            id: item.kebabType,
+            name: item.kebabName,
+            basePrice: item.unitPrice || item.price / item.quantity,
+          },
+          qty: item.quantity,
+        };
+      });
+      setOrderItems(restoredItems);
+    }
+
+    // MUHIM: Ma'lumot bir marta muvaffaqiyatli yuklanganini belgilaymiz!
+    setIsDataRestored(true);
+  }, [id, orders, isDataRestored]);
+
+  // URL dagi ID o'zgarganda flagni yangilash
+  useEffect(() => {
+    setIsDataRestored(false);
+  }, [id]);
 
   // const effectiveQty = customQtyStr ? parseInt(customQtyStr) || 1 : qty;
   const totalPrice = orderItems.reduce(
@@ -290,8 +352,6 @@ const NewOrder = () => {
   );
 
   const handleSubmit = useCallback(async () => {
-    // if (!selectedKebab) return;
-
     const loc = addLocToTavsif ? tavsifLocation : selectedLocation;
     const hasTavsif = tavsif.trim().length > 0;
 
@@ -305,48 +365,76 @@ const NewOrder = () => {
         return loc.desc ? `${loc.label} (${loc.desc})` : loc.label;
       }
       if (tavsif.trim()) return tavsif.trim();
-      return selectedKebab.name;
+      return "";
     })();
 
+    // O'zgaradigan yangi ma'lumotlar
+    const orderData = {
+      description,
+      customerName: selectedCustomer?.name || "",
+      customerId: selectedCustomer?.id || "",
+      locationType: loc?.type || "",
+      locationId: loc?.id || "",
+      locationLabel: loc?.label || "",
+      locationDesc: loc?.desc || "",
+      location: loc
+        ? loc.desc
+          ? `${loc.label} (${loc.desc})`
+          : loc.label
+        : "",
+      tavsif: tavsif.trim(),
+      items: orderItems.map((item) => ({
+        kebabType: item.kebab.id || item.kebab.kebabType || "",
+        kebabName: item.kebab.name || item.kebab.kebabName || "",
+        quantity: Number(item.qty),
+        unitPrice: Number(item.kebab.basePrice || item.kebab.unitPrice || 0),
+      })),
+      totalPrice: Number(totalPrice),
+      quantity: orderItems.reduce((sum, item) => sum + Number(item.qty), 0),
+    };
+
     try {
-      await createOrder({
-        identifier: generateOrderNumber("ORD"),
-        description,
-        customerName: selectedCustomer?.name || "",
-        customerId: selectedCustomer?.id || "",
-        locationType: loc?.type || "",
-        locationId: loc?.id || "",
-        locationLabel: loc?.label || "",
-        locationDesc: loc?.desc || "",
-        location: loc
-          ? loc.desc
-            ? `${loc.label} (${loc.desc})`
-            : loc.label
-          : "",
-        tavsif: tavsif.trim(),
-        items: orderItems.map((item) => ({
-          kebabType: item.kebab.id,
-          kebabName: item.kebab.name,
-          quantity: item.qty,
-          unitPrice: item.kebab.basePrice,
-        })),
-        totalPrice,
-      });
-      success("Buyurtma saqlandi");
+      if (id) {
+        // 📝 TAHRIRLASH REJIMI
+        // Context dagi orders ichidan eski buyurtmani to'liq topib olamiz
+        const originalOrder = orders.find((o) => o.id === id);
+
+        // Eski o'zgarmas ma'lumotlarni saqlab qolgan holda to'liq ob'ektni yangilaymiz
+        const fullUpdates = {
+          ...originalOrder, // Eski hamma narsa (createdAt, identifier, paid, paidAt, synced) saqlanadi!
+          ...orderData, // Yangi o'zgargan miqdor, mijoz va narxlar ustidan yoziladi
+          id: id, // ID o'zgarmasligi shart!
+          synced: false, // Offline-first tizim Firebase bilan qayta sinxronizatsiya qilishi uchun
+          updatedAt: Date.now(),
+        };
+
+        // Siz yuborgan Context funksiyasini chaqiramiz
+        await updateOrder(id, fullUpdates);
+        success("Buyurtma yangilandi");
+      } else {
+        // ➕ YANGI BUYURTMA QO'SHISH REJIMI
+        await createOrder({
+          ...orderData,
+          identifier: generateOrderNumber("ORD"),
+        });
+        success("Buyurtma saqlandi");
+      }
+
       setSaved(true);
       setTimeout(() => navigate("/orders"), 900);
     } catch (err) {
       error("Xatolik: " + err.message);
     }
   }, [
-    // selectedKebab,
+    id,
+    orders, // dependency massiviga orders qo'shildi (find ishlashi uchun)
+    updateOrder,
     selectedCustomer,
     selectedLocation,
     tavsif,
     tavsifLocation,
     addLocToTavsif,
-    // effectiveQty,
-    // unitPrice,
+    orderItems,
     totalPrice,
     createOrder,
     navigate,
@@ -444,7 +532,9 @@ const NewOrder = () => {
               <path d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-white">Yangi buyurtma</h1>
+          <h1 className="text-xl font-bold text-white">
+            {id ? "Buyurtmani tahrirlash" : "Yangi buyurtma"}
+          </h1>
           <div className="w-10" />
         </div>
       </header>

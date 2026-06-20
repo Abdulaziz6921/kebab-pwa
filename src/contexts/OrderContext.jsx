@@ -1,5 +1,12 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { orderService, syncService, SYNC_STATUS } from '../services';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import { orderService, syncService, SYNC_STATUS } from "../services";
+import { useAuth } from "./AuthContext";
 
 const OrderContext = createContext(undefined);
 
@@ -12,38 +19,46 @@ export const OrderProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [syncStatus, setSyncStatus] = useState(null);
-
+  const { user } = useAuth();
   // Initialize sync and load orders on mount
+
   useEffect(() => {
+    let unsubscribe = () => {};
+
     const initOrders = async () => {
       setLoading(true);
       try {
-        // Load orders from IndexedDB (offline-first)
         const localOrders = await orderService.getAll();
         setOrders(localOrders);
 
-        // Initialize sync service
+        // 🌟 Tizimga kirmagan bo'lsa Firebase ulanishini ochmaydi, qizil xatolik bermaydi
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        // Faqat user kirgandagina Firebase sinxronizatsiyasi boshlanadi
         syncService.init();
 
-        // Subscribe to sync status changes
-        const unsubscribe = syncService.subscribe((status) => {
+        unsubscribe = syncService.subscribe((status) => {
           setSyncStatus(status);
-          // Reload orders after successful sync
           if (status.completedAt) {
             loadOrders();
           }
         });
-
-        return unsubscribe;
       } catch (err) {
-        setError(err.message || 'Failed to load orders');
+        setError(err.message || "Failed to load orders");
       } finally {
         setLoading(false);
       }
     };
 
     initOrders();
-  }, []);
+
+    return () => {
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
+  }, [user]); // 🌟 user o'zgarganda (ya'ni login tugmasi bosilganda) avtomatik qayta ulanadi!
 
   // Load orders from IndexedDB
   const loadOrders = useCallback(async () => {
@@ -51,7 +66,7 @@ export const OrderProvider = ({ children }) => {
       const localOrders = await orderService.getAll();
       setOrders(localOrders);
     } catch (err) {
-      setError(err.message || 'Failed to load orders');
+      setError(err.message || "Failed to load orders");
     }
   }, []);
 
@@ -67,7 +82,7 @@ export const OrderProvider = ({ children }) => {
       }
       return result;
     } catch (err) {
-      setError(err.message || 'Failed to fetch orders');
+      setError(err.message || "Failed to fetch orders");
       throw err;
     } finally {
       setLoading(false);
@@ -84,31 +99,44 @@ export const OrderProvider = ({ children }) => {
       setOrders((prev) => [newOrder, ...prev]);
       return newOrder;
     } catch (err) {
-      setError(err.message || 'Failed to create order');
+      setError(err.message || "Failed to create order");
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Update an existing order (offline-first)
-  const updateOrder = useCallback(async (orderId, updates) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const updatedOrder = await orderService.update(orderId, updates);
-      // Update local state
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? updatedOrder : o))
-      );
-      return updatedOrder;
-    } catch (err) {
-      setError(err.message || 'Failed to update order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ─── TO'G'RILANGAN VARIANT (OrdersContext ichida) ───
+  const updateOrder = useCallback(
+    async (orderId, updates) => {
+      setLoading(true);
+      setError(null);
+      try {
+        // 🌟 XAVFSIZLIK SHARTI: items borligini tekshirib, keyin klonlaymiz
+        const finalUpdates = { ...updates };
+        if (updates && updates.items && Array.isArray(updates.items)) {
+          finalUpdates.items = [...updates.items]; // Agar items bo'lsa klonlaydi
+        } else {
+          delete finalUpdates.items; // Agar items bo'lsa-yu massiv bo'lmasa yoki umuman bo'lmasa, o'chirib tashlaydi
+        }
+
+        // Tozalangan finalUpdates ob'ektini yuboramiz
+        const updatedOrder = await orderService.update(orderId, finalUpdates);
+
+        // Mahalliy stateni yangilash
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? updatedOrder : o)),
+        );
+        return updatedOrder;
+      } catch (err) {
+        setError(err.message || "Failed to update order");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [orderService],
+  );
 
   // Mark order as paid
   const markOrderPaid = useCallback(async (orderId) => {
@@ -117,53 +145,70 @@ export const OrderProvider = ({ children }) => {
     try {
       const updatedOrder = await orderService.markPaid(orderId);
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? updatedOrder : o))
+        prev.map((o) => (o.id === orderId ? updatedOrder : o)),
       );
       return updatedOrder;
     } catch (err) {
-      setError(err.message || 'Failed to mark order as paid');
+      setError(err.message || "Failed to mark order as paid");
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Mark order as unpaid
+  const markOrderUnpaid = useCallback(
+    async (orderId) => {
+      return updateOrder(orderId, {
+        paid: false,
+        paidAt: null,
+      });
+    },
+    [updateOrder],
+  );
+
   // Delete an order (offline-first)
-  const deleteOrder = useCallback(async (orderId) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await orderService.delete(orderId);
-      // Update local state
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      // Clear selected order if it's the one being deleted
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder(null);
+  const deleteOrder = useCallback(
+    async (orderId) => {
+      setLoading(true);
+      setError(null);
+      try {
+        await orderService.delete(orderId);
+        // Update local state
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        // Clear selected order if it's the one being deleted
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(null);
+        }
+        return true;
+      } catch (err) {
+        setError(err.message || "Failed to delete order");
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      return true;
-    } catch (err) {
-      setError(err.message || 'Failed to delete order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedOrder]);
+    },
+    [selectedOrder],
+  );
 
   // Get order by ID (from state or IndexedDB)
-  const getOrderById = useCallback(async (orderId) => {
-    // First check state
-    const cached = orders.find((order) => order.id === orderId);
-    if (cached) return cached;
+  const getOrderById = useCallback(
+    async (orderId) => {
+      // First check state
+      const cached = orders.find((order) => order.id === orderId);
+      if (cached) return cached;
 
-    // If not in state, load from IndexedDB
-    try {
-      const order = await orderService.getById(orderId);
-      return order;
-    } catch (err) {
-      console.error('Failed to get order:', err);
-      return null;
-    }
-  }, [orders]);
+      // If not in state, load from IndexedDB
+      try {
+        const order = await orderService.getById(orderId);
+        return order;
+      } catch (err) {
+        console.error("Failed to get order:", err);
+        return null;
+      }
+    },
+    [orders],
+  );
 
   // Get order by identifier
   const getOrderByIdentifier = useCallback(async (identifier) => {
@@ -171,7 +216,7 @@ export const OrderProvider = ({ children }) => {
       const order = await orderService.getByIdentifier(identifier);
       return order;
     } catch (err) {
-      console.error('Failed to get order by identifier:', err);
+      console.error("Failed to get order by identifier:", err);
       return null;
     }
   }, []);
@@ -186,12 +231,17 @@ export const OrderProvider = ({ children }) => {
     return orders.filter((order) => order.paid);
   }, [orders]);
 
+  // Get debt orders
+  const getDebtOrders = useCallback(() => {
+    return orders.filter((order) => order.isDebt);
+  }, [orders]);
+
   // Get unsynced orders
   const getUnsyncedOrders = useCallback(() => {
     return orders.filter(
       (order) =>
         order.synced === SYNC_STATUS.PENDING ||
-        order.synced === SYNC_STATUS.FAILED
+        order.synced === SYNC_STATUS.FAILED,
     );
   }, [orders]);
 
@@ -199,6 +249,34 @@ export const OrderProvider = ({ children }) => {
   const getSyncedOrders = useCallback(() => {
     return orders.filter((order) => order.synced === SYNC_STATUS.SYNCED);
   }, [orders]);
+
+  // Toggle debt status
+  const toggleDebtStatus = useCallback(
+    async (orderId) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const order = await getOrderById(orderId);
+
+        const updatedOrder = await orderService.update(orderId, {
+          isDebt: !order.isDebt,
+        });
+
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? updatedOrder : o)),
+        );
+
+        return updatedOrder;
+      } catch (err) {
+        setError(err.message || "Failed to update debt status");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getOrderById],
+  );
 
   // Manual sync trigger
   const triggerSync = useCallback(async () => {
@@ -215,9 +293,12 @@ export const OrderProvider = ({ children }) => {
   }, []);
 
   // Cancel an order (mark as cancelled - different from delete)
-  const cancelOrder = useCallback(async (orderId) => {
-    return updateOrder(orderId, { cancelled: true, cancelledAt: Date.now() });
-  }, [updateOrder]);
+  const cancelOrder = useCallback(
+    async (orderId) => {
+      return updateOrder(orderId, { cancelled: true, cancelledAt: Date.now() });
+    },
+    [updateOrder],
+  );
 
   const value = {
     // State
@@ -234,6 +315,8 @@ export const OrderProvider = ({ children }) => {
     createOrder,
     updateOrder,
     markOrderPaid,
+    markOrderUnpaid,
+    toggleDebtStatus,
     deleteOrder,
     cancelOrder,
 
@@ -244,6 +327,7 @@ export const OrderProvider = ({ children }) => {
     getPaidOrders,
     getUnsyncedOrders,
     getSyncedOrders,
+    getDebtOrders,
 
     // Sync
     triggerSync,
@@ -254,16 +338,14 @@ export const OrderProvider = ({ children }) => {
   };
 
   return (
-    <OrderContext.Provider value={value}>
-      {children}
-    </OrderContext.Provider>
+    <OrderContext.Provider value={value}>{children}</OrderContext.Provider>
   );
 };
 
 export const useOrders = () => {
   const context = useContext(OrderContext);
   if (context === undefined) {
-    throw new Error('useOrders must be used within an OrderProvider');
+    throw new Error("useOrders must be used within an OrderProvider");
   }
   return context;
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrders, useToast } from "../contexts";
 import {
@@ -19,6 +19,12 @@ import {
   SquarePlus,
   Search,
   Pause,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  XCircle,
+  ArrowRightLeft,
+  CheckCircle,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,21 +99,88 @@ const todayDateStr = formatDate(Date.now(), {
 });
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
-function OrderCard({ order, onPay, paying }) {
+// function OrderCard({ order, onPay, paying }) {
+//   const { Icon, bg, text } = getOrderIcon(order);
+//   const primary = getOrderPrimary(order);
+//   const secondary = getOrderSecondary(order);
+//   const showTavsif = order.tavsif && order.locationLabel;
+
+//   return (
+//     <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+//       <div
+//         className={`w-10 h-10 rounded-xl flex items-center justify-center  ${bg} ${text}`}
+//       >
+//         <Icon className="w-5 h-5" />
+//       </div>
+
+//       <div className="flex-1 min-w-0">
+//         <p className="font-semibold text-navy-900 dark:text-white text-[15px] leading-tight truncate">
+//           {primary}
+//         </p>
+//         {showTavsif && (
+//           <p className="text-xs text-primary-500 truncate">{order.tavsif}</p>
+//         )}
+//         <p className="text-xs text-gray-400 mt-0.5">{secondary}</p>
+//       </div>
+
+//       <div className="flex flex-col items-end gap-1 shrink-0">
+//         <div className="flex items-center gap-1.5 ">
+//           {!order.paid && (
+//             <button
+//               onClick={() => onPay(order)}
+//               disabled={paying === order.id}
+//               className="active:scale-90 transition-transform disabled:opacity-50"
+//             >
+//               {paying === order.id ? (
+//                 <div className="w-7 h-7 rounded-full border-2 border-success-500 border-t-transparent animate-spin" />
+//               ) : (
+//                 <SquareMinus className="text-red-600" />
+//               )}
+//             </button>
+//           )}
+//         </div>
+//         <span className="text-xs text-gray-400 flex items-center gap-1">
+//           <FileText size={14} />
+//           {formatOrderTime(order.createdAt)}
+//         </span>
+//         {order.paidAt && (
+//           <span className="text-xs text-green-500 flex items-center gap-1">
+//             <SquarePlus size={16} />
+//             {formatOrderTime(order.paidAt)}
+//           </span>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+function OrderCard({ order, onPay, paying, onAction }) {
   const { Icon, bg, text } = getOrderIcon(order);
   const primary = getOrderPrimary(order);
   const secondary = getOrderSecondary(order);
   const showTavsif = order.tavsif && order.locationLabel;
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+    <div className="relative bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
       <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center  ${bg} ${text}`}
+        className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg} ${text}`}
       >
         <Icon className="w-5 h-5" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className={"flex-1 min-w-0 pr-6"}>
         <p className="font-semibold text-navy-900 dark:text-white text-[15px] leading-tight truncate">
           {primary}
         </p>
@@ -117,7 +190,9 @@ function OrderCard({ order, onPay, paying }) {
         <p className="text-xs text-gray-400 mt-0.5">{secondary}</p>
       </div>
 
-      <div className="flex flex-col items-end gap-1 shrink-0">
+      <div
+        className={`flex flex-col items-end gap-1 shrink-0 ${!order.paid && !order.isDebt ? "mr-6" : ""}`}
+      >
         <div className="flex items-center gap-1.5 ">
           {!order.paid && (
             <button
@@ -144,6 +219,71 @@ function OrderCard({ order, onPay, paying }) {
           </span>
         )}
       </div>
+
+      {/* ─── 3 Dots Menu Button and Dropdown ─── */}
+      {!order.paid && !order.isDebt && (
+        <div className="absolute right-2 top-3" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            <MoreVertical size={18} />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-700 rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 py-1 z-20">
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onAction("edit", order);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 text-left"
+              >
+                <Edit2 size={15} className="text-blue-500" /> Tahrirlash
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onAction("delete", order);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 text-left"
+              >
+                <Trash2 size={15} /> O'chirish
+              </button>
+              {!order.paid ? (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAction("markPaid", order);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 text-left"
+                >
+                  <CheckCircle size={15} /> To'landi qilish
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAction("markUnpaid", order);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 text-left"
+                >
+                  <XCircle size={15} /> To'lanmadi qilish
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onAction("toNasiya", order);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-left"
+              >
+                <ArrowRightLeft size={15} /> Nasiyaga o'tkazish
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -151,7 +291,8 @@ function OrderCard({ order, onPay, paying }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const Orders = () => {
   const navigate = useNavigate();
-  const { orders, loading, markOrderPaid } = useOrders();
+  const { orders, loading, markOrderPaid, updateOrder, deleteOrder } =
+    useOrders();
   const { success, error, confirm } = useToast();
 
   const [activeTab, setActiveTab] = useState("unpaid");
@@ -170,15 +311,21 @@ const Orders = () => {
     );
   };
 
+  // 1. Bugungi to'lanmagan va nasiya bo'lmagan buyurtmalar
   const unpaidToday = orders
-    .filter((o) => !o.paid && isToday(o.createdAt))
+    .filter((o) => !o.paid && isToday(o.createdAt) && !o.isDebt)
     .sort((a, b) => a.createdAt - b.createdAt);
 
+  // 2. Bugungi to'langan buyurtmalar
   const paidToday = orders
-    .filter((o) => o.paid && isToday(o.paidAt || o.updatedAt || o.createdAt))
+    .filter((o) => o.paid && isToday(o.createdAt))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const debtOrders = orders.filter((o) => !o.paid && !isToday(o.createdAt));
+  // 3. ─── 🛠️ NASIYALAR FILTRINI XAVFSIZ QILAMIZ ───
+  // Faqat TO'LANMAGAN (paid: false) va isDebt: true bo'lgan buyurtmalargina Nasiya bo'lib qoladi!
+  const debtOrders = orders
+    .filter((o) => !o.paid && (o.isDebt || !isToday(o.createdAt))) // !o.paid sharti boshiga qo'shildi
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   const displayOrders = (
     activeTab === "unpaid"
@@ -208,7 +355,14 @@ const Orders = () => {
 
     setPaying(order.id);
     try {
-      await markOrderPaid(order.id);
+      // ─── 🛠️ MUHIM TUZATISH: markOrderPaid o'rniga updateOrder dan foydalanamiz ───
+      // Bu orqali paid: true bo'lishi bilan birga isDebt ham aniq false bo'ladi va Firebase-ga ketadi
+      await updateOrder(order.id, {
+        paid: true,
+        paidAt: Date.now(),
+        isDebt: false, // Nasiyalar ro'yxatidan o'chirish sharti
+      });
+
       success("To'lov qabul qilindi");
     } catch (err) {
       error("Xatolik yuz berdi: " + err.message);
@@ -217,7 +371,66 @@ const Orders = () => {
     }
   };
 
+  const handleMenuAction = async (type, order) => {
+    try {
+      switch (type) {
+        case "edit":
+          navigate(`/edit-order/${order.id}`);
+          break;
+
+        case "delete":
+          const confirmDelete = await confirm(
+            "O'chirish",
+            `Haqiqatdan ham ushbu buyurtmani o'chirmoqchimisiz?`,
+          );
+          if (!confirmDelete) return;
+          await deleteOrder(order.id);
+          success("Buyurtma o'chirildi");
+          break;
+
+        case "markPaid":
+          // 1. To'lov qilinganda, agar u oldin nasiya bo'lsa, isDebt false bo'lishi shart.
+          // Agar context ichidagi markOrderPaid buni avtomat qilmasa, updateOrder bilan isDebt ni o'chiramiz:
+          await updateOrder(order.id, {
+            paid: true,
+            paidAt: Date.now(),
+            isDebt: false, // To'langani uchun nasiya holati o'chadi
+          });
+          success("Buyurtma to'langan deb belgilandi");
+          break;
+
+        case "markUnpaid":
+          // To'lanmadi qilinganda u oddiy bugungi to'lanmagan buyurtmaga aylanadi, nasiyaga emas
+          await updateOrder(order.id, {
+            paid: false,
+            paidAt: null,
+            isDebt: false, // Oddiy to'lanmagan buyurtma
+          });
+          success("Buyurtma to'lanmagan deb belgilandi");
+          break;
+
+        case "toNasiya":
+          // 🌟 Buyurtmani nasiyaga o'tkazishda isDebt true qilinadi
+          await updateOrder(order.id, {
+            paid: false,
+            paidAt: null,
+            isDebt: true, // Nasiyalar ro'yxatiga o'tadi
+          });
+          success("Nasiyaga o'tkazildi");
+          break;
+
+        default:
+          break;
+      }
+    } catch (err) {
+      error("Xatolik yuz berdi: " + err.message);
+    }
+  };
+
+  // Har bir tab uchun jami summalarni hisoblash
   const unpaidTotal = unpaidToday.reduce((s, o) => s + (o.totalPrice || 0), 0);
+  const paidTotal = paidToday.reduce((s, o) => s + (o.totalPrice || 0), 0);
+  const debtTotal = debtOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 pb-20">
@@ -319,13 +532,27 @@ const Orders = () => {
         </div>
       </header>
 
-      {/* Unpaid total */}
-      {activeTab === "unpaid" && unpaidTotal > 0 && (
+      {/* Jami summa (Barcha tablar uchun dinamik) */}
+      {((activeTab === "unpaid" && unpaidTotal > 0) ||
+        (activeTab === "paid" && paidTotal > 0) ||
+        (activeTab === "debt" && debtTotal > 0)) && (
         <div className="px-4 py-3">
           <div className="bg-white dark:bg-gray-800 rounded-xl px-4 py-2.5 flex justify-between items-center shadow-sm">
-            <span className="text-sm text-gray-500">Jami summa</span>
+            <span className="text-sm text-gray-500">
+              {activeTab === "unpaid"
+                ? "To'lanmagan jami"
+                : activeTab === "paid"
+                  ? "To'langan jami"
+                  : "Nasiyalar jami"}
+            </span>
             <span className="text-xl font-extrabold text-navy-900 dark:text-white">
-              {formatCurrency(unpaidTotal)}
+              {formatCurrency(
+                activeTab === "unpaid"
+                  ? unpaidTotal
+                  : activeTab === "paid"
+                    ? paidTotal
+                    : debtTotal,
+              )}
             </span>
           </div>
         </div>
@@ -352,6 +579,7 @@ const Orders = () => {
               order={order}
               onPay={handlePay}
               paying={paying}
+              onAction={handleMenuAction} // Mana shu qator o'zgardi
             />
           ))
         )}

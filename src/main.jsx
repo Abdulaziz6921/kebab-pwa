@@ -9,27 +9,31 @@ import {
   SettingsProvider,
   ToastProvider,
 } from "./contexts";
+// 🌟 1. YANGI QO'SHILGAN IMPORT: AuthProvider ni shu yerga olib kelamiz
+import { AuthProvider } from "./contexts/AuthContext";
 import { router } from "./router";
 import "./index.css";
 import { registerSW } from "virtual:pwa-register";
 
-// Service Worker-ni avtomatik ro'yxatdan o'tkazish
 registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <ThemeProvider>
-      <OfflineProvider>
-        <SettingsProvider>
-          <CustomerProvider>
-            <OrderProvider>
-              <ToastProvider>
-                <RouterProvider router={router} />
-              </ToastProvider>
-            </OrderProvider>
-          </CustomerProvider>
-        </SettingsProvider>
-      </OfflineProvider>
-    </ThemeProvider>
+    {/* 🌟 2. TUZATISH: AuthProvider eng tepaga qo'yildi, endi useAuth() hamma yerda ishlaydi */}
+    <AuthProvider>
+      <ThemeProvider>
+        <OfflineProvider>
+          <SettingsProvider>
+            <CustomerProvider>
+              <OrderProvider>
+                <ToastProvider>
+                  <RouterProvider router={router} />
+                </ToastProvider>
+              </OrderProvider>
+            </CustomerProvider>
+          </SettingsProvider>
+        </OfflineProvider>
+      </ThemeProvider>
+    </AuthProvider>
   </StrictMode>,
 );

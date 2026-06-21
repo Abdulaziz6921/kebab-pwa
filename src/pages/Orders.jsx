@@ -7,6 +7,7 @@ import {
   formatDate,
 } from "../utils/formatters";
 import { LOC_TYPE } from "../utils/locations";
+import OrderDetailsModal from "./OrderDetails";
 import {
   FileText,
   UserRound,
@@ -98,61 +99,6 @@ const todayDateStr = formatDate(Date.now(), {
   year: "2-digit",
 });
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
-// function OrderCard({ order, onPay, paying }) {
-//   const { Icon, bg, text } = getOrderIcon(order);
-//   const primary = getOrderPrimary(order);
-//   const secondary = getOrderSecondary(order);
-//   const showTavsif = order.tavsif && order.locationLabel;
-
-//   return (
-//     <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
-//       <div
-//         className={`w-10 h-10 rounded-xl flex items-center justify-center  ${bg} ${text}`}
-//       >
-//         <Icon className="w-5 h-5" />
-//       </div>
-
-//       <div className="flex-1 min-w-0">
-//         <p className="font-semibold text-navy-900 dark:text-white text-[15px] leading-tight truncate">
-//           {primary}
-//         </p>
-//         {showTavsif && (
-//           <p className="text-xs text-primary-500 truncate">{order.tavsif}</p>
-//         )}
-//         <p className="text-xs text-gray-400 mt-0.5">{secondary}</p>
-//       </div>
-
-//       <div className="flex flex-col items-end gap-1 shrink-0">
-//         <div className="flex items-center gap-1.5 ">
-//           {!order.paid && (
-//             <button
-//               onClick={() => onPay(order)}
-//               disabled={paying === order.id}
-//               className="active:scale-90 transition-transform disabled:opacity-50"
-//             >
-//               {paying === order.id ? (
-//                 <div className="w-7 h-7 rounded-full border-2 border-success-500 border-t-transparent animate-spin" />
-//               ) : (
-//                 <SquareMinus className="text-red-600" />
-//               )}
-//             </button>
-//           )}
-//         </div>
-//         <span className="text-xs text-gray-400 flex items-center gap-1">
-//           <FileText size={14} />
-//           {formatOrderTime(order.createdAt)}
-//         </span>
-//         {order.paidAt && (
-//           <span className="text-xs text-green-500 flex items-center gap-1">
-//             <SquarePlus size={16} />
-//             {formatOrderTime(order.paidAt)}
-//           </span>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
 function OrderCard({ order, onPay, paying, onAction }) {
   const { Icon, bg, text } = getOrderIcon(order);
   const primary = getOrderPrimary(order);
@@ -299,6 +245,7 @@ const Orders = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [paying, setPaying] = useState(null);
+  const [modalOrderDetails, setModalOrderDetails] = useState(null);
 
   const isToday = (date) => {
     const d = new Date(date);
@@ -400,11 +347,10 @@ const Orders = () => {
           break;
 
         case "markUnpaid":
-          // To'lanmadi qilinganda u oddiy bugungi to'lanmagan buyurtmaga aylanadi, nasiyaga emas
           await updateOrder(order.id, {
             paid: false,
             paidAt: null,
-            isDebt: false, // Oddiy to'lanmagan buyurtma
+            isDebt: false,
           });
           success("Buyurtma to'lanmagan deb belgilandi");
           break;
@@ -473,7 +419,7 @@ const Orders = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab("unpaid")}
-              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all${
+              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 activeTab === "unpaid"
                   ? "bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-300"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-500"
@@ -492,7 +438,7 @@ const Orders = () => {
             </button>
             <button
               onClick={() => setActiveTab("paid")}
-              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all${
+              className={`flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                 activeTab === "paid"
                   ? "bg-success-100 dark:bg-success-900 text-success-700 dark:text-success-300"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-500"
@@ -531,13 +477,12 @@ const Orders = () => {
           </div>
         </div>
       </header>
-
       {/* Jami summa (Barcha tablar uchun dinamik) */}
       {((activeTab === "unpaid" && unpaidTotal > 0) ||
         (activeTab === "paid" && paidTotal > 0) ||
         (activeTab === "debt" && debtTotal > 0)) && (
         <div className="px-4 py-3">
-          <div className="bg-white dark:bg-gray-800 rounded-xl px-4 py-2.5 flex justify-between items-center shadow-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl px-4 py-2.5 flex justify-between items-center shadow-sm ">
             <span className="text-sm text-gray-500">
               {activeTab === "unpaid"
                 ? "To'lanmagan jami"
@@ -557,7 +502,6 @@ const Orders = () => {
           </div>
         </div>
       )}
-
       {/* List */}
       <div className="px-4 space-y-2 py-2">
         {loading ? (
@@ -574,18 +518,28 @@ const Orders = () => {
           </div>
         ) : (
           displayOrders.map((order) => (
-            <OrderCard
+            <button
               key={order.id}
-              order={order}
-              onPay={handlePay}
-              paying={paying}
-              onAction={handleMenuAction} // Mana shu qator o'zgardi
-            />
+              onClick={() => setModalOrderDetails(order)} // 🌟 Kartani bosganda modalni ochadi
+              className="w-full text-left focus:outline-none block active:scale-[0.99] transition-transform"
+            >
+              <OrderCard
+                order={order}
+                onPay={handlePay}
+                paying={paying}
+                onAction={handleMenuAction}
+              />
+            </button>
           ))
         )}
       </div>
-
-      {/* FAB */}
+      {modalOrderDetails && (
+        <OrderDetailsModal
+          order={modalOrderDetails}
+          onClose={() => setModalOrderDetails(null)}
+        />
+      )}
+      ;{/* FAB */}
       <button
         onClick={() => navigate("/new-order")}
         className="fixed right-4 bottom-20 w-14 h-14 bg-primary-500 text-white rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-transform z-10"

@@ -16,6 +16,7 @@ import {
   X,
   Check,
   Trash2,
+  Pencil,
 } from "lucide-react";
 
 // ─── Location button visual config ────────────────────────────────────────────
@@ -515,7 +516,7 @@ const NewOrder = () => {
     );
   };
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 pb-32">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 pb-10">
       <header className="bg-navy-900 sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-4">
           <button
@@ -953,7 +954,7 @@ const NewOrder = () => {
         </div>
       </div>
 
-      <div className="fixed bottom-16 left-0 right-0 px-4 pb-3 pt-1 z-20">
+      <div className="px-4 pt-6 z-20 mt-4">
         <button
           onClick={handleSubmit}
           disabled={loading}
@@ -963,15 +964,18 @@ const NewOrder = () => {
             <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <Check size={22} color="white" />
+              {id ? (
+                <Pencil size={22} color="white" />
+              ) : (
+                <Check size={22} color="white" />
+              )}
               <span className="text-white text-lg font-extrabold tracking-wider">
-                Qo'shish
+                {id ? "Tahrirlash" : "Qo'shish"}
               </span>
             </>
           )}
         </button>
       </div>
-
       {showAddCustomer && (
         <CustomerModal
           onSave={handleAddCustomer}

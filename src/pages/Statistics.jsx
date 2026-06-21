@@ -495,7 +495,7 @@ const Statistics = () => {
                 <div>
                   <p className="text-xs text-gray-500">Nasiyalar</p>
                   <p className="text-lg font-extrabold text-navy-900 dark:text-white leading-none mt-0.5">
-                    {metrics.isDebt}
+                    {metrics.debtCount}
                   </p>
                 </div>
               </div>

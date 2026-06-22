@@ -7,6 +7,7 @@ import {
   formatDate,
 } from "../utils/formatters";
 import { LOC_TYPE } from "../utils/locations";
+import { groupOrdersByDay } from "../utils/orderDisplay";
 import OrderDetailsModal from "./OrderDetails";
 import {
   FileText,
@@ -142,7 +143,10 @@ function OrderCard({ order, onPay, paying, onAction }) {
         <div className="flex items-center gap-1.5 ">
           {!order.paid && (
             <button
-              onClick={() => onPay(order)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPay(order);
+              }}
               disabled={paying === order.id}
               className="active:scale-90 transition-transform disabled:opacity-50"
             >
@@ -170,7 +174,10 @@ function OrderCard({ order, onPay, paying, onAction }) {
       {!order.paid && !order.isDebt && (
         <div className="absolute right-2 top-3" ref={menuRef}>
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(!menuOpen);
+            }}
             className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
             <MoreVertical size={18} />
@@ -179,7 +186,8 @@ function OrderCard({ order, onPay, paying, onAction }) {
           {menuOpen && (
             <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-700 rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 py-1 z-20">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onAction("edit", order);
                 }}
@@ -188,7 +196,8 @@ function OrderCard({ order, onPay, paying, onAction }) {
                 <Edit2 size={15} className="text-blue-500" /> Tahrirlash
               </button>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onAction("delete", order);
                 }}
@@ -198,7 +207,8 @@ function OrderCard({ order, onPay, paying, onAction }) {
               </button>
               {!order.paid ? (
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setMenuOpen(false);
                     onAction("markPaid", order);
                   }}
@@ -208,7 +218,8 @@ function OrderCard({ order, onPay, paying, onAction }) {
                 </button>
               ) : (
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setMenuOpen(false);
                     onAction("markUnpaid", order);
                   }}
@@ -218,7 +229,8 @@ function OrderCard({ order, onPay, paying, onAction }) {
                 </button>
               )}
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onAction("toNasiya", order);
                 }}
@@ -288,6 +300,9 @@ const Orders = () => {
       (o.tavsif || "").toLowerCase().includes(q)
     );
   });
+
+  const groupedDebtOrders =
+    activeTab === "debt" ? groupOrdersByDay(displayOrders) : [];
 
   const handlePay = async (order) => {
     if (order.paid || paying === order.id) return;
@@ -410,7 +425,7 @@ const Orders = () => {
                 setShowSearch((s) => !s);
                 setSearchQuery("");
               }}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 active:scale-95"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 active:scale-95 "
             >
               <Search />
             </button>
@@ -503,7 +518,7 @@ const Orders = () => {
         </div>
       )}
       {/* List */}
-      <div className="px-4 space-y-2 py-2">
+      <div className="px-4 space-y-3 py-2">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
@@ -516,12 +531,75 @@ const Orders = () => {
                 ? `Assalomu aleykum, ${todayDateStr} uchun to'lanmangan buyurtmalar yo'q, iltimos buyurtma qo'shing`
                 : `${todayDateStr} uchun to'langan buyurtmalar yo'q`}
           </div>
+        ) : activeTab === "debt" ? (
+          /* 🌟 1. NASIYALAR TABI UCHUN: Mahalliy xavfsiz guruhlash mantiqi */
+          (() => {
+            // Nasiyalarni sanasi bo'yicha guruhlaymiz
+            const groups = {};
+            displayOrders.forEach((order) => {
+              const dateObj = new Date(order.createdAt);
+              const dateStr = dateObj.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }); // Formati: 22 Jun 2026
+
+              if (!groups[dateStr]) groups[dateStr] = [];
+              groups[dateStr].push(order);
+            });
+
+            // Guruhlangan ma'lumotni JSX formatida chiqaramiz
+            return Object.entries(groups).map(([dateLabel, ordersInGroup]) => (
+              <div key={dateLabel} className="space-y-2">
+                {/* 🌟 Kalendar ikonka va chiroyli sana sarlavhasi */}
+                <div className="flex items-center gap-2 text-navy-900 dark:text-white font-bold text-sm px-1 py-1 mt-3">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                  >
+                    <rect
+                      x="3"
+                      y="4"
+                      width="18"
+                      height="18"
+                      rx="2"
+                      ry="2"
+                    ></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  <span>{dateLabel}</span>
+                </div>
+
+                {/* Shu kunga tegishli buyurtmalar */}
+                {ordersInGroup.map((order) => (
+                  <div
+                    key={order.id}
+                    onClick={() => setModalOrderDetails(order)}
+                    className="w-full text-left focus:outline-none block transition-transform"
+                  >
+                    <OrderCard
+                      order={order}
+                      onPay={handlePay}
+                      paying={paying}
+                      onAction={handleMenuAction}
+                    />
+                  </div>
+                ))}
+              </div>
+            ));
+          })()
         ) : (
+          /* 🌟 2. TO'LANMAGAN VA TO'LANGAN TABLAR UCHUN: Oddiy o'zingizning eski tartibingiz */
           displayOrders.map((order) => (
-            <button
+            <div
               key={order.id}
-              onClick={() => setModalOrderDetails(order)} // 🌟 Kartani bosganda modalni ochadi
-              className="w-full text-left focus:outline-none block active:scale-[0.99] transition-transform"
+              onClick={() => setModalOrderDetails(order)}
+              className="w-full text-left focus:outline-none block transition-transform"
             >
               <OrderCard
                 order={order}
@@ -529,17 +607,18 @@ const Orders = () => {
                 paying={paying}
                 onAction={handleMenuAction}
               />
-            </button>
+            </div>
           ))
         )}
       </div>
+
       {modalOrderDetails && (
         <OrderDetailsModal
           order={modalOrderDetails}
           onClose={() => setModalOrderDetails(null)}
         />
       )}
-      ;{/* FAB */}
+      {/* FAB */}
       <button
         onClick={() => navigate("/new-order")}
         className="fixed right-4 bottom-20 w-14 h-14 bg-primary-500 text-white rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-transform z-10"

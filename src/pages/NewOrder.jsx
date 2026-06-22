@@ -17,6 +17,8 @@ import {
   Check,
   Trash2,
   Pencil,
+  Search,
+  Edit2,
 } from "lucide-react";
 
 // ─── Location button visual config ────────────────────────────────────────────
@@ -154,6 +156,7 @@ const NewOrder = () => {
   const [tavsif, setTavsif] = useState("");
   const [addLocToTavsif, setAddLocToTavsif] = useState(false);
   const [tavsifLocation, setTavsifLocation] = useState(null);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const [orderItems, setOrderItems] = useState([
     {
@@ -564,63 +567,113 @@ const NewOrder = () => {
           </div>
 
           {activeTab === "customers" && (
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 space-y-3">
+              {/* 🌟 JONLI QIDIRUV INPUT MAYDONI (Vaqtni tejash uchun eng muhim qism) */}
+              <div className="relative">
+                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Mijoz ismini yozing (Masalan: Abdulloh)..."
+                  className="w-full pl-10 pr-9 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-navy-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-400 transition-all"
+                />
+                {customerSearch && (
+                  <button
+                    onClick={() => setCustomerSearch("")}
+                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
               {customers.length === 0 ? (
                 <p className="text-gray-400 text-sm py-2">
                   Hozircha mijoz yo'q
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  {customers.map((c) => {
-                    const isSelected = selectedCustomer?.id === c.id;
-                    return (
-                      <div key={c.id} className="relative group">
-                        <button
-                          onClick={() => handleSelectCustomer(c)}
-                          className={`w-full flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-semibold text-sm active:scale-95 ${
-                            isSelected
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-600"
-                              : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-navy-800 dark:text-gray-200"
-                          }`}
-                        >
-                          <span
-                            className={
-                              isSelected ? "text-primary-500" : "text-navy-400"
-                            }
-                          >
-                            <UserRound size={16} color="currentColor" />
-                          </span>
-                          <span className="truncate">{c.name}</span>
-                          {c.is_favorite && (
-                            <span className="ml-auto text-yellow-400 shrink-0">
-                              <Star size={13} filled color="#facc15" />
-                            </span>
-                          )}
-                        </button>
-                        <div className="absolute top-1 right-1 hidden group-hover:flex gap-1">
-                          <button
-                            onClick={() => setEditingCustomer(c)}
-                            className="w-6 h-6 bg-white dark:bg-gray-700 rounded-full shadow flex items-center justify-center"
-                          >
-                            <Trash2 size={11} color="#6b7280" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCustomer(c.id)}
-                            className="w-6 h-6 bg-white dark:bg-gray-700 rounded-full shadow flex items-center justify-center"
-                          >
-                            <Trash2 size={11} color="#ef4444" />
-                          </button>
-                        </div>
-                      </div>
+                /* 🌟 FILTERLASH VA SARALASH MANTIQI: Kiritilgan harfga ko'ra darhol elakdan o'tkazadi */
+                (() => {
+                  const filtered = customers
+                    .filter((c) =>
+                      (c.name || "")
+                        .toLowerCase()
+                        .includes(customerSearch.toLowerCase()),
+                    )
+                    .sort((a, b) =>
+                      (a.name || "").localeCompare(b.name || "", "uz"),
                     );
-                  })}
-                </div>
+
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-gray-400 text-xs py-4 text-center">
+                        Bunday mijoz topilmadi
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-2 gap-2 mb-2 max-h-[45vh] overflow-y-auto pr-1 scrollbar-none">
+                      {filtered.map((c) => {
+                        const isSelected = selectedCustomer?.id === c.id;
+                        return (
+                          <div key={c.id} className="relative group">
+                            <button
+                              onClick={() => {
+                                handleSelectCustomer(c);
+                                setCustomerSearch(""); // Mijoz tanlangach qidiruvni tozalaydi
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-semibold text-sm active:scale-95 transition-all text-left ${
+                                isSelected
+                                  ? "border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-600"
+                                  : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-navy-800 dark:text-gray-200"
+                              }`}
+                            >
+                              <span
+                                className={
+                                  isSelected
+                                    ? "text-primary-500"
+                                    : "text-navy-400"
+                                }
+                              >
+                                <UserRound size={16} />
+                              </span>
+                              <span className="truncate flex-1">{c.name}</span>
+                              {c.is_favorite && (
+                                <span className="text-yellow-400 shrink-0">
+                                  <Star size={13} filled color="#facc15" />
+                                </span>
+                              )}
+                            </button>
+
+                            <div className="absolute top-1 right-1 hidden group-hover:flex gap-1 z-10">
+                              <button
+                                onClick={() => setEditingCustomer(c)}
+                                className="w-6 h-6 bg-white dark:bg-gray-700 rounded-full shadow flex items-center justify-center hover:bg-gray-50"
+                              >
+                                <Edit2 size={11} color="#6b7280" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCustomer(c.id)}
+                                className="w-6 h-6 bg-white dark:bg-gray-700 rounded-full shadow flex items-center justify-center hover:bg-red-50"
+                              >
+                                <Trash2 size={11} color="#ef4444" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               )}
+
               <button
                 onClick={() => setShowAddCustomer(true)}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-primary-300 text-primary-500 font-semibold text-sm w-full justify-center active:scale-95"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-primary-300 text-primary-500 font-semibold text-sm w-full justify-center active:scale-95"
               >
-                <Plus size={16} color="currentColor" /> Yangi mijoz qo'shish
+                <Plus size={16} /> Yangi mijoz qo'shish
               </button>
             </div>
           )}

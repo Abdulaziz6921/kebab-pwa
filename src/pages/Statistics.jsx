@@ -140,25 +140,47 @@ function RevenueBarChart({ data, label }) {
   );
 }
 
-// ─── Metric card ──────────────────────────────────────────────────────────────
-function MetricCard({ label, value, sub, accent }) {
+// ─── Metric card ───
+function MetricCard({ label, value, sub, accent, className }) {
+  const bgClass = className
+    ? className
+    : accent
+      ? "bg-navy-800 text-white"
+      : "bg-white dark:bg-gray-800 text-navy-900 dark:text-white";
+
   return (
-    <div
-      className={`rounded-2xl p-4 ${accent ? "bg-navy-800" : "bg-white dark:bg-gray-800"} shadow-sm`}
-    >
+    <div className={`rounded-2xl p-4 shadow-sm ${bgClass}`}>
       <p
-        className={`text-xs font-semibold mb-1 ${accent ? "text-navy-200" : "text-gray-400"}`}
+        className={`text-xs font-semibold mb-1 ${
+          className
+            ? "text-white/80"
+            : accent
+              ? "text-navy-200"
+              : "text-gray-400"
+        }`}
       >
         {label}
       </p>
       <p
-        className={`text-xl font-extrabold leading-tight ${accent ? "text-white" : "text-navy-900 dark:text-white"}`}
+        className={`text-xl font-extrabold leading-tight ${
+          className
+            ? "text-white"
+            : accent
+              ? "text-white"
+              : "text-navy-900 dark:text-white"
+        }`}
       >
         {value}
       </p>
       {sub && (
         <p
-          className={`text-xs mt-1 ${accent ? "text-navy-300" : "text-gray-400"}`}
+          className={`text-xs mt-1 ${
+            className
+              ? "text-white/90"
+              : accent
+                ? "text-navy-300"
+                : "text-gray-400"
+          }`}
         >
           {sub}
         </p>
@@ -215,7 +237,7 @@ const Statistics = () => {
 
   // ── Key metrics ───────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    // 1. Bugungi kunni tekshirish uchun helper (agar kerak bo'lsa)
+    // 1. Bugungi kunni tekshirish uchun helper
     const isToday = (date) => {
       const d = new Date(date);
       const today = new Date();
@@ -247,15 +269,21 @@ const Statistics = () => {
     );
     const debtTotal = debtOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
+    // 🌟 YANGI QO'SHILGAN QISM: Tanlangan davrdagi mutloq BARCHA buyurtmalar jami summasi
+    const allOrdersTotalSum = periodOrders.reduce(
+      (s, o) => s + (o.totalPrice || 0),
+      0,
+    );
+
     return {
       revenue,
       pendingRev,
-      debtTotal, // Nasiyadagi jami pul summasi
+      debtTotal,
+      allOrdersTotalSum, // Barcha buyurtmalarning jami puli
       total: periodOrders.length,
       paid: paid.length,
-      pendingCount: pendingOrders.length, // Bugungi kutilayotgan buyurtmalar soni
-      debtCount: debtOrders.length, // Jami nasiya buyurtmalar soni
-      avgRev: paid.length > 0 ? Math.round(revenue / paid.length) : 0,
+      pendingCount: pendingOrders.length,
+      debtCount: debtOrders.length,
     };
   }, [periodOrders]);
 
@@ -358,29 +386,35 @@ const Statistics = () => {
         {/* ── Key metrics ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard
-            label="Daromad"
-            value={formatCurrency(metrics.revenue)}
-            sub={
-              metrics.avgRev > 0
-                ? `O'rtacha: ${formatCurrency(metrics.avgRev)}`
-                : undefined
-            }
+            label="Jami buyurtma"
+            value={formatCurrency(metrics.allOrdersTotalSum)}
+            sub={`${metrics.total} ta umumiy buyurtma`}
             accent
           />
+
+          <div className="[&_*]:!text-white">
+            <MetricCard
+              label="To'langan"
+              value={formatCurrency(metrics.revenue)}
+              sub={`${metrics.paid} ta buyurtma to'landi`}
+              className="!bg-green-500 dark:!bg-green-600"
+            />
+          </div>
+
+          <div className="[&_*]:!text-white">
+            <MetricCard
+              label="Nasiyalar"
+              value={formatCurrency(metrics.debtTotal)}
+              sub={`${metrics.debtCount} ta buyurtma nasiya`}
+              className="!bg-red-500 dark:!bg-red-600"
+            />
+          </div>
+
           <MetricCard
             label="Kutilmoqda"
             value={formatCurrency(metrics.pendingRev)}
-            sub={`${metrics.pendingCount} ta to'lanmagan`} // 🌟 "unpaid" o'rniga "pendingCount" ulandi
-          />
-          <MetricCard
-            label="Jami buyurtma"
-            value={metrics.total}
-            sub={`${metrics.paid} to'langan`}
-          />
-          <MetricCard
-            label="Nasiyalar"
-            value={formatCurrency(metrics.debtTotal)} // 🌟 Nasiya bo'lib turgan jami pul miqdori
-            sub={`${metrics.debtCount} ta buyurtma nasiya`} // 🌟 Nasiya buyurtmalar soni
+            sub={`${metrics.pendingCount} ta to'lanmagan`}
+            className="!bg-gray-500 dark:!bg-gray-600"
           />
         </div>
 

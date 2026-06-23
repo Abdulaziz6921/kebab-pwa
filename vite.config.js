@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       manifest: {
-        name: "Restaurant Order Tracker",
-        short_name: "OrderTracker",
+        name: "Kebab Tracker",
+        short_name: "Kebab Tracker",
         description: "Track restaurant orders in real-time",
         theme_color: "#dc2626",
         background_color: "#ffffff",

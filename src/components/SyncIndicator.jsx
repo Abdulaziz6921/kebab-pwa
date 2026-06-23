@@ -12,7 +12,7 @@ const SyncIndicator = () => {
     if (!isOnline) {
       setNotification({
         type: "offline",
-        message: "📱 Internet yo'q. Ma'lumotlar keyin yuboriladi.",
+        message: "📴 Internet yo'q. Ma'lumotlar keyin yuboriladi.",
       });
     } else if (pendingSyncCount > 0) {
       setNotification({
@@ -26,7 +26,7 @@ const SyncIndicator = () => {
 
     const timer = setTimeout(() => {
       setNotification(null);
-    }, 3000);
+    }, 100000);
 
     return () => clearTimeout(timer);
   }, [isOnline, pendingSyncCount, syncInProgress]);
@@ -52,14 +52,18 @@ const SyncIndicator = () => {
 
       {/* Notifications */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[99998] animate-in slide-in-from-top duration-300">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm sm:max-w-full z-[99998] animate-in slide-in-from-top duration-300">
           <div
-            className={`px-4 py-3 rounded-xl shadow-xl text-white max-w-md ${
-              notification.type === "offline" ? "bg-red-500" : "bg-amber-500"
+            className={`px-4 py-3.5 rounded-2xl shadow-2xl text-white backdrop-blur-md bg-opacity-95 ${
+              notification.type === "offline"
+                ? "bg-red-500 shadow-red-500/20"
+                : "bg-amber-500 shadow-amber-500/20"
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{notification.message}</span>
+            <div className="flex items-center justify-center gap-2 text-center">
+              <span className="text-sm font-bold tracking-wide active:scale-95 transition-transform">
+                {notification.message}
+              </span>
             </div>
           </div>
         </div>

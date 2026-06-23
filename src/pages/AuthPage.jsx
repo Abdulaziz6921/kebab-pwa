@@ -92,7 +92,7 @@ export default function AuthPage() {
         </p>
 
         {firebaseError && (
-          <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm mb-4">
+          <div className="flex flex-col items-center text-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm mb-4">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{firebaseError}</span>
           </div>

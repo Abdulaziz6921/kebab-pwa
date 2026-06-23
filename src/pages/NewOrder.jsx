@@ -924,12 +924,12 @@ const NewOrder = () => {
         )}
         {isMan && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-3 border border-orange-100 dark:border-orange-950/40">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-navy-900 dark:text-white flex items-center gap-2">
+            <div className="md:flex items-center justify-between ">
+              <h2 className="text-base font-bold text-navy-900 dark:text-white flex items-center gap-2 ">
                 <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                Savdo pulidan olingan pul (Obed)
+                Obedga olingan pul miqdori
               </h2>
-              <span className="text-xs font-semibold text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-1 rounded-lg">
+              <span className="text-xs md:text-sm font-semibold text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-1 md:rounded-lg rounded-xs whitespace-nowrap">
                 Nasiyaga yoziladi
               </span>
             </div>
@@ -944,14 +944,14 @@ const NewOrder = () => {
                 onChange={(e) => setObedSumma(e.target.value)}
                 className="w-full text-md font-bold bg-transparent text-navy-900 dark:text-white outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
               />
-              <span className="text-xl font-black text-gray-400 dark:text-gray-500 ml-2 tracking-wide uppercase select-none">
+              <span className="text-sm font-black text-gray-400 dark:text-gray-500 ml-2 tracking-wide uppercase select-none">
                 so'm
               </span>
             </div>
 
             <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 pl-1">
-              * Ushbu xarajat summasi jami naqd savdo pulidan (kassadan)
-              avtomatik chegiriladi.
+              * Ushbu xarajat summasi jami naqd savdo pulidan avtomatik
+              ayiriladi.
             </p>
           </div>
         )}

@@ -26,7 +26,7 @@ const SyncIndicator = () => {
 
     const timer = setTimeout(() => {
       setNotification(null);
-    }, 100000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [isOnline, pendingSyncCount, syncInProgress]);

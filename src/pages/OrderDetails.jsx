@@ -72,7 +72,6 @@ export default function OrderDetailsModal({ order, onClose }) {
         </div>
 
         <div className="space-y-3">
-          {/* 🌟 Import qilingan getOrderPrimary avtomatik ishlaydi */}
           <Row label="Kim / Joy" value={getOrderPrimary(order)} />
           {order.tavsif && <Row label="Tavsif" value={order.tavsif} />}
 
@@ -94,11 +93,14 @@ export default function OrderDetailsModal({ order, onClose }) {
             }
           />
 
+          {order.description && (
+            <Row label="Tafsilot" value={order.description} />
+          )}
+
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-gray-500">Jami</span>
               <span className="text-xl font-extrabold text-primary-500">
-                {/* 🌟 Import qilingan formatCurrency avtomatik ishlaydi */}
                 {formatCurrency(order.totalPrice || 0)}
               </span>
             </div>

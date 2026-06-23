@@ -19,11 +19,6 @@ export function getOrderPrimary(order) {
   return order.description || order.identifier || "";
 }
 
-// export function getOrderSecondary(order) {
-//   if (!order) return '';
-//   const kebab = KEBAB_LABELS[order.kebabType] || order.kebabType || '';
-//   return `${order.quantity || 1} ta${kebab ? ' ' + kebab : ''}`;
-// }
 export function getOrderSecondary(order) {
   if (!order) return "";
 

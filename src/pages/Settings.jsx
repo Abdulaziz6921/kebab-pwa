@@ -233,7 +233,7 @@ const Settings = () => {
 
       success("Sinxronizatsiya tugadi");
     } catch (err) {
-      // Kutilmagan texnik xatoliklar uchun
+      // Texnik xatoliklar uchun
       error("Sinxronizatsiya xatosi: " + err.message);
     } finally {
       setSyncing(false);

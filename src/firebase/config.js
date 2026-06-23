@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // <-- 1. GET_AUTH IMPORT QILINDI
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -13,13 +13,13 @@ const firebaseConfig = {
 
 let app = null;
 let db = null;
-let auth = null; // <-- 2. AUTH VAQTINCHALIK O'ZGARUVCHISI
+let auth = null;
 
 export const initializeFirebase = () => {
   if (!app && firebaseConfig.apiKey && firebaseConfig.projectId) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
-    auth = getAuth(app); // <-- 3. AUTH SHU YERDA ISHGA TUSHIRILADI
+    auth = getAuth(app);
   }
   return { app, db, auth };
 };
@@ -31,7 +31,6 @@ export const getFirestoreDB = () => {
   return db;
 };
 
-// 4. AUTH INSTANCE-NI XAVFSIZ OLISH UCHUN YANGI FUNKSIYA
 export const getFirebaseAuth = () => {
   if (!auth) initializeFirebase();
   return auth;
@@ -51,8 +50,6 @@ export const COLLECTIONS = {
   USERS: "users",
 };
 
-// Dastlabki yuklanishda avtomatik ishga tushirish (Auth ishlashi uchun)
 initializeFirebase();
 
-// 5. EXPORT QISMI
 export { app, db, auth };

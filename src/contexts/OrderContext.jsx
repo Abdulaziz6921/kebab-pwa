@@ -31,13 +31,11 @@ export const OrderProvider = ({ children }) => {
         const localOrders = await orderService.getAll();
         setOrders(localOrders);
 
-        // 🌟 Tizimga kirmagan bo'lsa Firebase ulanishini ochmaydi, qizil xatolik bermaydi
         if (!user) {
           setLoading(false);
           return;
         }
 
-        // Faqat user kirgandagina Firebase sinxronizatsiyasi boshlanadi
         syncService.init();
 
         unsubscribe = syncService.subscribe((status) => {
@@ -58,7 +56,7 @@ export const OrderProvider = ({ children }) => {
     return () => {
       if (typeof unsubscribe === "function") unsubscribe();
     };
-  }, [user]); // 🌟 user o'zgarganda (ya'ni login tugmasi bosilganda) avtomatik qayta ulanadi!
+  }, [user]);
 
   // Load orders from IndexedDB
   const loadOrders = useCallback(async () => {
@@ -106,24 +104,20 @@ export const OrderProvider = ({ children }) => {
     }
   }, []);
 
-  // ─── TO'G'RILANGAN VARIANT (OrdersContext ichida) ───
   const updateOrder = useCallback(
     async (orderId, updates) => {
       setLoading(true);
       setError(null);
       try {
-        // 🌟 XAVFSIZLIK SHARTI: items borligini tekshirib, keyin klonlaymiz
         const finalUpdates = { ...updates };
         if (updates && updates.items && Array.isArray(updates.items)) {
-          finalUpdates.items = [...updates.items]; // Agar items bo'lsa klonlaydi
+          finalUpdates.items = [...updates.items];
         } else {
-          delete finalUpdates.items; // Agar items bo'lsa-yu massiv bo'lmasa yoki umuman bo'lmasa, o'chirib tashlaydi
+          delete finalUpdates.items;
         }
 
-        // Tozalangan finalUpdates ob'ektini yuboramiz
         const updatedOrder = await orderService.update(orderId, finalUpdates);
 
-        // Mahalliy stateni yangilash
         setOrders((prev) =>
           prev.map((o) => (o.id === orderId ? updatedOrder : o)),
         );

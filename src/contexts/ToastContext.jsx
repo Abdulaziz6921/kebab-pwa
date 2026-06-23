@@ -4,66 +4,100 @@
  * Modern, animated notification system replacing browser alerts.
  */
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 
 const ToastContext = createContext(undefined);
 
 // ─── Toast Types ──────────────────────────────────────────────────────────────
 const TOAST_TYPES = {
   success: {
-    bg:      'bg-success-500',
-    icon:    'check',
-    animate: 'animate-slide-up',
+    bg: "bg-success-500",
+    icon: "check",
+    animate: "animate-slide-up",
   },
   error: {
-    bg:      'bg-error-500',
-    icon:    'x',
-    animate: 'animate-slide-up',
+    bg: "bg-error-500",
+    icon: "x",
+    animate: "animate-slide-up",
   },
   info: {
-    bg:      'bg-blue-500',
-    icon:    'info',
-    animate: 'animate-slide-up',
+    bg: "bg-blue-500",
+    icon: "info",
+    animate: "animate-slide-up",
   },
   warning: {
-    bg:      'bg-warning-500',
-    icon:    'warning',
-    animate: 'animate-slide-up',
+    bg: "bg-warning-500",
+    icon: "warning",
+    animate: "animate-slide-up",
   },
 };
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const CheckIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={3}
+  >
     <path d="M5 13l4 4L19 7" />
   </svg>
 );
 
 const XIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+  >
     <path d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
 const InfoIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
     <circle cx="12" cy="12" r="10" />
     <path d="M12 16v-4M12 8h.01" />
   </svg>
 );
 
 const WarningIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
     <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
   </svg>
 );
 
 const ToastIcon = ({ type }) => {
   switch (type) {
-    case 'success':  return <CheckIcon />;
-    case 'error':    return <XIcon />;
-    case 'warning':  return <WarningIcon />;
-    default:         return <InfoIcon />;
+    case "success":
+      return <CheckIcon />;
+    case "error":
+      return <XIcon />;
+    case "warning":
+      return <WarningIcon />;
+    default:
+      return <InfoIcon />;
   }
 };
 
@@ -86,10 +120,19 @@ function Toast({ toast, onDismiss }) {
       </div>
       <p className="flex-1 text-sm font-medium leading-snug">{toast.message}</p>
       <button
-        onClick={(e) => { e.stopPropagation(); onDismiss(toast.id); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss(toast.id);
+        }}
         className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
       >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
@@ -98,10 +141,19 @@ function Toast({ toast, onDismiss }) {
 }
 
 // ─── Confirmation Dialog ──────────────────────────────────────────────────────
-function ConfirmDialog({ isOpen, title, message, confirmText = 'Tasdiqlash', cancelText = 'Bekor qilish', variant = 'danger', onConfirm, onCancel }) {
+function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmText = "Tasdiqlash",
+  cancelText = "Bekor qilish",
+  variant = "danger",
+  onConfirm,
+  onCancel,
+}) {
   if (!isOpen) return null;
 
-  const isDanger = variant === 'danger';
+  const isDanger = variant === "danger";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -136,7 +188,7 @@ function ConfirmDialog({ isOpen, title, message, confirmText = 'Tasdiqlash', can
           <button
             onClick={onConfirm}
             className={`flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all active:scale-[0.98] ${
-              isDanger ? 'bg-error-500' : 'bg-primary-500'
+              isDanger ? "bg-error-500" : "bg-primary-500"
             }`}
           >
             {confirmText}
@@ -148,7 +200,16 @@ function ConfirmDialog({ isOpen, title, message, confirmText = 'Tasdiqlash', can
 }
 
 // ─── Prompt Dialog (replaces browser prompt) ────────────────────────────────────
-function PromptDialog({ isOpen, title, placeholder = '', defaultValue = '', confirmText = 'Saqlash', cancelText = 'Bekor qilish', onConfirm, onCancel }) {
+function PromptDialog({
+  isOpen,
+  title,
+  placeholder = "",
+  defaultValue = "",
+  confirmText = "Saqlash",
+  cancelText = "Bekor qilish",
+  onConfirm,
+  onCancel,
+}) {
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -173,12 +234,12 @@ function PromptDialog({ isOpen, title, placeholder = '', defaultValue = '', conf
             autoFocus
             type="text"
             value={value}
-            onChange={e => setValue(e.target.value)}
+            onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
             className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-navy-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-400"
-            onKeyDown={e => {
-              if (e.key === 'Enter' && value.trim()) onConfirm(value.trim());
-              if (e.key === 'Escape') onCancel();
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && value.trim()) onConfirm(value.trim());
+              if (e.key === "Escape") onCancel();
             }}
           />
         </div>
@@ -209,25 +270,37 @@ export const ToastProvider = ({ children }) => {
   const [confirmState, setConfirmState] = useState({ isOpen: false });
   const [promptState, setPromptState] = useState({ isOpen: false });
 
-  const addToast = useCallback((message, type = 'info', duration = 3000) => {
+  const addToast = useCallback((message, type = "info", duration = 3000) => {
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type }]);
 
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, duration);
 
     return id;
   }, []);
 
   const removeToast = useCallback((id) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const success = useCallback((message, duration) => addToast(message, 'success', duration), [addToast]);
-  const error = useCallback((message, duration) => addToast(message, 'error', duration), [addToast]);
-  const info = useCallback((message, duration) => addToast(message, 'info', duration), [addToast]);
-  const warning = useCallback((message, duration) => addToast(message, 'warning', duration), [addToast]);
+  const success = useCallback(
+    (message, duration) => addToast(message, "success", duration),
+    [addToast],
+  );
+  const error = useCallback(
+    (message, duration) => addToast(message, "error", duration),
+    [addToast],
+  );
+  const info = useCallback(
+    (message, duration) => addToast(message, "info", duration),
+    [addToast],
+  );
+  const warning = useCallback(
+    (message, duration) => addToast(message, "warning", duration),
+    [addToast],
+  );
 
   // Confirm dialog - returns a promise
   const confirm = useCallback((title, message, options = {}) => {
@@ -236,9 +309,9 @@ export const ToastProvider = ({ children }) => {
         isOpen: true,
         title,
         message,
-        confirmText: options.confirmText || 'Tasdiqlash',
-        cancelText: options.cancelText || 'Bekor qilish',
-        variant: options.variant || 'danger',
+        confirmText: options.confirmText || "Tasdiqlash",
+        cancelText: options.cancelText || "Bekor qilish",
+        variant: options.variant || "danger",
         onConfirm: () => {
           setConfirmState({ isOpen: false });
           resolve(true);
@@ -257,10 +330,10 @@ export const ToastProvider = ({ children }) => {
       setPromptState({
         isOpen: true,
         title,
-        placeholder: options.placeholder || '',
-        defaultValue: options.defaultValue || '',
-        confirmText: options.confirmText || 'Saqlash',
-        cancelText: options.cancelText || 'Bekor qilish',
+        placeholder: options.placeholder || "",
+        defaultValue: options.defaultValue || "",
+        confirmText: options.confirmText || "Saqlash",
+        cancelText: options.cancelText || "Bekor qilish",
         onConfirm: (value) => {
           setPromptState({ isOpen: false });
           resolve(value);
@@ -291,7 +364,7 @@ export const ToastProvider = ({ children }) => {
 
       {/* Toast Container - bottom center on mobile, bottom-right on desktop */}
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-4 z-50 flex flex-col gap-2 items-center md:items-end pointer-events-none">
-        {toasts.map(toast => (
+        {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
             <Toast toast={toast} onDismiss={removeToast} />
           </div>
@@ -311,7 +384,7 @@ export const ToastProvider = ({ children }) => {
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error("useToast must be used within a ToastProvider");
   }
   return context;
 };

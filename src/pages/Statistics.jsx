@@ -67,8 +67,8 @@ function HBar({ label, value, max, color, unit = "ta" }) {
 function RevenueBarChart({ data, label }) {
   if (!data.length) return null;
 
-  // 🌟 Ustunlar ko'p bo'lsa (Soatlik/Oylikda > 12) grafikni balandroq qilamiz,
-  // bu raqamlar ustma-ust tushib ketishining oldini oladi
+  //  Ustunlar ko'p bo'lsa (Soatlik/Oylikda > 12) grafikni balandroq qilamiz
+
   const isLarge = data.length > 12;
   const maxPx = isLarge ? 140 : 96; // 96px dan 140px ga balandlashdi
 
@@ -89,12 +89,10 @@ function RevenueBarChart({ data, label }) {
             <div
               key={i}
               className="flex flex-col items-center justify-end gap-1 shrink-0"
-              // 🌟 Ustunlar ko'p bo'lsa eng kichik kenglikni siqib qo'ymaymiz (minimal joy qoldiramiz)
               style={{ flex: 1, minWidth: isLarge ? 20 : 25 }}
             >
               {d.value > 0 && (
                 <span
-                  // 🌟 Raqamlar yopishib ketmasligi uchun matn o'lchamini soatlikda text-[9px] qildik
                   className={`font-semibold text-gray-500 leading-none whitespace-nowrap mb-0.5 tracking-tighter ${
                     data.length > 20
                       ? "text-[9px]"
@@ -248,39 +246,64 @@ const Statistics = () => {
       );
     };
 
-    // 2. Buyurtmalarni statuslariga ko'ra ajratamiz
-    const paid = periodOrders.filter((o) => o.paid);
+    // Agar bu Obed yozuvi bo'lsa va items massivi bo'sh bo'lsa (shashlik tanlanmagan bo'lsa),
+    // uni asosiy buyurtmalar ro'yxatidan butunlay o'chirib tashlaymiz!
+    const cleanPeriodOrders = periodOrders.filter(
+      (o) => !(o.isObed && (!o.items || o.items.length === 0)),
+    );
+
+    // Buyurtmalarni statuslariga ko'ra ajratamiz (Faqat tozalangan buyurtmalarni)
+    const paid = cleanPeriodOrders.filter((o) => o.paid);
 
     // Bugungi to'lanmagan va nasiya bo'lmaganlar (Kutilmoqda)
-    const pendingOrders = periodOrders.filter(
+    const pendingOrders = cleanPeriodOrders.filter(
       (o) => !o.paid && isToday(o.createdAt) && !o.isDebt,
     );
 
-    // Jami nasiya buyurtmalar
+    // Jami nasiya buyurtmalar (Haqiqiy qarzlar + "Man"ning hamma xarajatlari)
     const debtOrders = periodOrders.filter(
       (o) => o.isDebt || (!o.paid && !isToday(o.createdAt)),
     );
 
-    // 3. Pullarni (Summalarni) hisoblaymiz
-    const revenue = paid.reduce((s, o) => s + (o.totalPrice || 0), 0);
+    // Pullarni (Summalarni) hisoblaymiz
+
+    // G'aladondan olingan jami sof obed pullari summasi (Masalan: 20000)
+    const obedTotalSum = periodOrders
+      .filter((o) => o.isObed)
+      .reduce((s, o) => {
+        return s + (o.debtAmount || 0);
+      }, 0);
+
+    // Naqd savdo puli (Revenue / Kassa): Haqiqiy to'langan puldan olingan sof naqd pul AYRILADI!
+    const revenue =
+      paid.reduce((s, o) => s + (o.totalPrice || 0), 0) - obedTotalSum;
+
     const pendingRev = pendingOrders.reduce(
       (s, o) => s + (o.totalPrice || 0),
       0,
     );
+
+    // Nasiya (Qarzlar): "Man"ning hamma qarzi (kabob + naqd pul) to'liq qo'shiladi
     const debtTotal = debtOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
-    // 🌟 YANGI QO'SHILGAN QISM: Tanlangan davrdagi mutloq BARCHA buyurtmalar jami summasi
-    const allOrdersTotalSum = periodOrders.reduce(
-      (s, o) => s + (o.totalPrice || 0),
-      0,
-    );
+    // Jami buyurtmalar summasi: Faqat kaboblar pulini qo'shadi, obed pullarini qo'shmaydi
+    const allOrdersTotalSum = cleanPeriodOrders.reduce((s, o) => {
+      if (o.isObed) {
+        const kebabOnlyPrice = (o.totalPrice || 0) - (o.debtAmount || 0);
+        return s + kebabOnlyPrice;
+      }
+      return s + (o.totalPrice || 0);
+    }, 0);
 
     return {
       revenue,
       pendingRev,
       debtTotal,
-      allOrdersTotalSum, // Barcha buyurtmalarning jami puli
-      total: periodOrders.length,
+      allOrdersTotalSum,
+
+      //  Endi faqat pul kiritilganda buyurtma soni mutloq oshmaydi va toza chiqadi!
+      total: cleanPeriodOrders.length,
+
       paid: paid.length,
       pendingCount: pendingOrders.length,
       debtCount: debtOrders.length,
@@ -552,7 +575,6 @@ const Statistics = () => {
               Hali daromad yo'q
             </p>
           ) : (
-            /* 🌟 MUHIM TUZATISH: Mobil uchun skrol va dinamik kenglik qo'shildi */
             <div className="w-full overflow-x-auto scrollbar-none">
               <div className={"w-full"}>
                 <RevenueBarChart data={barData} />

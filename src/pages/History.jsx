@@ -83,7 +83,6 @@ function getIconStyle(order) {
 function DayGroup({ group, searchQuery, onOrderClick }) {
   const [expanded, setExpanded] = useState(false);
 
-  // 1. Avval qidiruvga ko'ra filtrlangan massivni olamiz
   const filteredOrders = searchQuery
     ? group.orders.filter((o) => {
         const q = searchQuery.toLowerCase();
@@ -99,8 +98,6 @@ function DayGroup({ group, searchQuery, onOrderClick }) {
       })
     : group.orders;
 
-  // 2. 🌟 FILTRLANGAN MASSIVNI VAQT BO'YICHA O'SISH TARTIBIDA SARALAYMIZ
-  // (Birinchi yaratilgan yoki to'langan buyurtma ro'yxatda birinchi chiqadi)
   const visibleOrders = [...filteredOrders].sort((a, b) => {
     const timeA = a.paid ? a.paidAt : a.createdAt;
     const timeB = b.paid ? b.paidAt : b.createdAt;

@@ -24,7 +24,7 @@ export const OfflineProvider = ({ children }) => {
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
   const syncIntervalRef = useRef(null);
-  const pingIntervalRef = useRef(null); // Ping uchun yangi ref
+  const pingIntervalRef = useRef(null);
 
   // 1. Haqiqiy internet borligini tekshirish funksiyasi (Ping)
   const checkActualInternet = useCallback(async () => {
@@ -33,7 +33,7 @@ export const OfflineProvider = ({ children }) => {
       return;
     }
     try {
-      // Eng yengil va keshlanmaydigan ping so'rovi
+      // Eng yengil va keshlanmaydigan ping so'rov
       await fetch("https://google.com", {
         mode: "no-cors",
         cache: "no-store",
@@ -63,8 +63,8 @@ export const OfflineProvider = ({ children }) => {
     // Dastlabki yuklanishda haqiqiy internetni tekshirish
     checkActualInternet();
 
-    // Har 5 soniyada internet borligini jimgina tekshirib turish
-    pingIntervalRef.current = setInterval(checkActualInternet, 5000);
+    // Har 10 soniyada internet borligini jimgina tekshirib turish
+    pingIntervalRef.current = setInterval(checkActualInternet, 10000);
 
     return () => {
       window.removeEventListener("online", handleOnline);
@@ -96,7 +96,6 @@ export const OfflineProvider = ({ children }) => {
         }
       });
 
-      // Davriy sinxronizatsiyani tekshirish
       if (isOnline && isFirebaseConfigured()) {
         syncIntervalRef.current = setInterval(async () => {
           const pending = await syncService.getPendingCount();

@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Bugungi kunni "YYYY-MM-DD" formatida olish funksiyasi
+  // Bugungi kunni "YYYY-MM-DD" format olish funksiyasi
   const getTodayString = () => {
     return new Date().toISOString().split("T")[0];
   };
@@ -33,24 +33,33 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const savedDate = localStorage.getItem("auth_login_date");
-        const todayDate = getTodayString();
+      try {
+        if (currentUser) {
+          const savedDate = localStorage.getItem("auth_login_date");
+          const todayDate = getTodayString();
 
-        // Agar saqlangan sana bugungi kunga teng bo'lmasa (Kun almashgan bo'lsa)
-        if (savedDate !== todayDate) {
-          console.log("Kun almashdi! Yangi login talab qilinadi.");
-          localStorage.removeItem("auth_login_date");
-          await signOut(auth); // Avtomatik tizimdan chiqarib yuborish
-          setUser(null);
+          if (savedDate && savedDate !== todayDate) {
+            console.log("Kun almashdi! Yangi login talab qilinadi.");
+
+            localStorage.removeItem("auth_login_date");
+            await signOut(auth);
+            setUser(null);
+          } else {
+            setUser(currentUser);
+
+            if (!savedDate) {
+              localStorage.setItem("auth_login_date", todayDate);
+            }
+          }
         } else {
-          // Kun hali o'zgarmagan bo'lsa, tizimda qoladi
-          setUser(currentUser);
+          setUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error(error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

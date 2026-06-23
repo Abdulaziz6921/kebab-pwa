@@ -9,7 +9,6 @@ import {
   SettingsProvider,
   ToastProvider,
 } from "./contexts";
-// 🌟 1. YANGI QO'SHILGAN IMPORT: AuthProvider ni shu yerga olib kelamiz
 import { AuthProvider } from "./contexts/AuthContext";
 import { router } from "./router";
 import "./index.css";
@@ -19,7 +18,6 @@ registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    {/* 🌟 2. TUZATISH: AuthProvider eng tepaga qo'yildi, endi useAuth() hamma yerda ishlaydi */}
     <AuthProvider>
       <ThemeProvider>
         <OfflineProvider>

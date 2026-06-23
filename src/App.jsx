@@ -23,7 +23,6 @@ function ProjectLayout() {
   );
 }
 
-// 🌟 TUZATISH: Ortiqcha ichki AuthProvider olib tashlandi
 function App() {
   return <ProjectLayout />;
 }

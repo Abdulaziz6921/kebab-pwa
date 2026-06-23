@@ -51,11 +51,7 @@ export default function AuthPage() {
     try {
       await login(email, password);
 
-      // 🌟 ENGI MUHIM TUZATISH: Login muvaffaqiyatli bo'lishi bilan
-      // foydalanuvchini darhol asosiy sahifaga yo'naltiramiz!
-      setTimeout(() => {
-        navigate("/");
-      }, 900);
+      navigate("/orders");
     } catch (err) {
       console.error(err.code);
       if (
@@ -130,26 +126,23 @@ export default function AuthPage() {
             <div className="relative">
               <Lock className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
               <input
-                // 1. Holatga qarab input turi o'zgaradi
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                // 2. O'ng tomondan ikonka siqib qo'ymasligi uchun pr-10 berildi
                 className={`w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-700 border rounded-xl text-sm text-navy-900 dark:text-white outline-none transition-all
         ${errors.password ? "border-red-500 focus:ring-2 focus:ring-red-400" : "border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary-400"}`}
                 placeholder="******"
               />
 
-              {/* 3. Ko'rsatish va yashirish ko'z ikonka tugmasi */}
               <button
-                type="button" // Form yuborilib ketmasligi uchun majburiy atribut
+                type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
               >
                 {showPassword ? (
-                  <EyeOff className="w-4 h-4" /> // Yashirish
+                  <EyeOff className="w-4 h-4" /> // Hide
                 ) : (
-                  <Eye className="w-4 h-4" /> // Ko'rsatish
+                  <Eye className="w-4 h-4" /> // Show
                 )}
               </button>
             </div>

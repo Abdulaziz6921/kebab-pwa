@@ -166,6 +166,42 @@ const NewOrder = () => {
   ]);
 
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [obedSumma, setObedSumma] = useState("");
+  const isMan = selectedCustomer?.name?.toLowerCase() === "man";
+
+  const handleSaveObed = async () => {
+    if (!obedSumma || isNaN(obedSumma)) {
+      error("Iltimos, summani to'g'ri kiriting!");
+      return;
+    }
+
+    try {
+      await updateCustomer(selectedCustomer.id, {
+        ...selectedCustomer,
+        balance: (selectedCustomer.balance || 0) + Number(obedSumma), // Nasiyaga qarz bo'lib qo'shiladi
+      });
+
+      // Kassadagi umumiy summadan (TotalOrderAmount) ayirish logikasi:
+
+      await createOrder({
+        orderNumber: generateOrderNumber(),
+        customerName: "Man (Obed)",
+        customerId: selectedCustomer.id,
+        totalPrice: -Number(obedSumma), // SUMMA MINUS BO'LADI
+        items: [],
+        createdAt: new Date().toISOString(),
+      });
+
+      success("Obed summasi savdo pulidan ayirildi va Nasiyaga yozildi!");
+      setObedSumma("");
+      setSelectedCustomer(null);
+      navigate("/orders");
+    } catch (err) {
+      error("Xatolik yuz berdi!");
+    }
+  };
+  // ──────────────────────────────────────────────────────────────────
+
   const [editingCustomer, setEditingCustomer] = useState(null);
 
   const [saved, setSaved] = useState(false);
@@ -173,7 +209,6 @@ const NewOrder = () => {
 
   // 📝 Tahrirlash rejimi uchun eski ma'lumotlarni xavfsiz yuklash logikasi:
   useEffect(() => {
-    // Agar id bo'lmasa, yoki orders hali yuklanmagan bo'lsa, yoki ma'lumot allaqachon yuklangan bo'lsa - to'xtatamiz
     if (!id || !orders || orders.length === 0 || isDataRestored) return;
 
     const orderToEdit = orders.find((o) => o.id === id);
@@ -221,16 +256,13 @@ const NewOrder = () => {
       setOrderItems(restoredItems);
     }
 
-    // MUHIM: Ma'lumot bir marta muvaffaqiyatli yuklanganini belgilaymiz!
     setIsDataRestored(true);
   }, [id, orders, isDataRestored]);
 
-  // URL dagi ID o'zgarganda flagni yangilash
   useEffect(() => {
     setIsDataRestored(false);
   }, [id]);
 
-  // const effectiveQty = customQtyStr ? parseInt(customQtyStr) || 1 : qty;
   const totalPrice = orderItems.reduce(
     (sum, item) => sum + item.qty * item.kebab.basePrice,
     0,
@@ -249,10 +281,27 @@ const NewOrder = () => {
     return "";
   })();
 
-  const handleSelectCustomer = useCallback((c) => {
-    setSelectedCustomer((prev) => (prev?.id === c.id ? null : c));
-    setSelectedLocation(null);
-  }, []);
+  const handleSelectCustomer = useCallback(
+    (c) => {
+      setSelectedCustomer((prev) => {
+        const isSelected = prev?.id === c.id;
+        const nextSelection = isSelected ? null : c;
+
+        //  Agar "Man" tanlansa, pastdagi shashlik ro'yxatini bo'shatamiz (ixtiyoriy rejim)
+        if (nextSelection && nextSelection.name?.toLowerCase() === "man") {
+          setOrderItems([]);
+        } else {
+          // Agar boshqa har qanday mijoz tanlansa yoki tanlov bekor qilinsa, standart 1 ta shashlikni qaytaramiz
+          setOrderItems([{ kebab: KEBAB_TYPES[0], qty: 1 }]);
+        }
+
+        return nextSelection;
+      });
+
+      setSelectedLocation(null);
+    },
+    [KEBAB_TYPES],
+  );
 
   const handleSelectLocation = useCallback((loc) => {
     setSelectedLocation((prev) => (prev?.id === loc.id ? null : loc));
@@ -263,16 +312,6 @@ const NewOrder = () => {
     setQty(n);
     setCustomQtyStr("");
   }, []);
-
-  // const adjustQty = useCallback(
-  //   (delta) => {
-  //     const base = customQtyStr ? parseInt(customQtyStr) || 1 : qty;
-  //     const next = Math.max(1, base + delta);
-  //     setCustomQtyStr(String(next));
-  //     setQty(next);
-  //   },
-  //   [customQtyStr, qty],
-  // );
 
   const addOrderItem = () => {
     setOrderItems((prev) => [
@@ -356,6 +395,85 @@ const NewOrder = () => {
   );
 
   const handleSubmit = useCallback(async () => {
+    if (isMan) {
+      const obedAmount = Number(obedSumma) || 0;
+
+      // Tanlangan kaboblar miqdori va umumiy narxi
+      const kebabQty = orderItems.reduce(
+        (sum, item) => sum + Number(item.qty),
+        0,
+      );
+
+      //Agar shashlik tanlanmagan bo'lsa, uning narxi 0 so'm bo'ladi
+      const kebabPrice = orderItems.reduce((sum, item) => {
+        if (!item.kebab || !item.kebab.basePrice) return sum;
+        return sum + Number(item.qty) * Number(item.kebab.basePrice || 0);
+      }, 0);
+
+      // Agar pul ham kiritilmagan, kabob ham tanlanmagan bo'lsa, unda ogohlantiramiz
+      if (obedAmount === 0 && kebabQty === 0) {
+        error("Iltimos, summani kiriting yoki shashlik tanlang!");
+        return;
+      }
+
+      const orderTotal = kebabPrice + obedAmount;
+
+      try {
+        await createOrder({
+          identifier: generateOrderNumber("ORD"),
+
+          // ─── 🌟 DINAMIK DESCRIPTION LOGIKASI ───
+          description: (() => {
+            if (kebabQty > 0) {
+              const kebabDetails = orderItems
+                .map((item) => `${item.qty} ta ${item.kebab?.name || ""}`)
+                .join(", ");
+
+              // Agar qo'shimcha obed puli ham bo'lsa, uni ham yoniga qo'shadi
+              return obedAmount > 0
+                ? `Man (${kebabDetails} + ${obedAmount} so'm pul)`
+                : `Man (${kebabDetails})`;
+            }
+            // Agar shashlik tanlanmay, faqat pul olingan bo'lsa
+            return `Man (Obedga: ${obedAmount} so'm)`;
+          })(),
+          // ───────────────────────────────────────
+
+          customerName: "Man",
+          customerId: selectedCustomer.id,
+          totalPrice: orderTotal,
+          debtAmount: obedAmount,
+          items:
+            kebabQty > 0
+              ? orderItems.map((item) => ({
+                  kebabType: item.kebab?.id || "",
+                  kebabName: item.kebab?.name || "",
+                  quantity: Number(item.qty),
+                  unitPrice: Number(item.kebab?.basePrice || 0),
+                }))
+              : [],
+
+          //  Agar kabob sotilmagan bo'lsa, quantity mutloq 0 bo'ladi!
+          quantity: kebabQty > 0 ? kebabQty : 0,
+
+          paid: false,
+          isDebt: true,
+          isObed: true,
+          createdAt: new Date().toISOString(),
+        });
+
+        success("Muvaffaqiyatli saqlandi!");
+        setObedSumma("");
+        setSelectedCustomer(null);
+        setSaved(true);
+        setTimeout(() => navigate("/orders"), 900);
+      } catch (err) {
+        error("Xatolik: " + err.message);
+      }
+      return;
+    }
+
+    // Man dan tashqari BOSHQA MIJOZLAR UCHUN ISHLAYDIGAN KOD
     const loc = addLocToTavsif ? tavsifLocation : selectedLocation;
     const hasTavsif = tavsif.trim().length > 0;
 
@@ -399,24 +517,17 @@ const NewOrder = () => {
 
     try {
       if (id) {
-        // 📝 TAHRIRLASH REJIMI
-        // Context dagi orders ichidan eski buyurtmani to'liq topib olamiz
         const originalOrder = orders.find((o) => o.id === id);
-
-        // Eski o'zgarmas ma'lumotlarni saqlab qolgan holda to'liq ob'ektni yangilaymiz
         const fullUpdates = {
-          ...originalOrder, // Eski hamma narsa (createdAt, identifier, paid, paidAt, synced) saqlanadi!
-          ...orderData, // Yangi o'zgargan miqdor, mijoz va narxlar ustidan yoziladi
-          id: id, // ID o'zgarmasligi shart!
-          synced: false, // Offline-first tizim Firebase bilan qayta sinxronizatsiya qilishi uchun
+          ...originalOrder,
+          ...orderData,
+          id: id,
+          synced: false,
           updatedAt: Date.now(),
         };
-
-        // Siz yuborgan Context funksiyasini chaqiramiz
         await updateOrder(id, fullUpdates);
         success("Buyurtma yangilandi");
       } else {
-        // ➕ YANGI BUYURTMA QO'SHISH REJIMI
         await createOrder({
           ...orderData,
           identifier: generateOrderNumber("ORD"),
@@ -431,7 +542,7 @@ const NewOrder = () => {
     }
   }, [
     id,
-    orders, // dependency massiviga orders qo'shildi (find ishlashi uchun)
+    orders,
     updateOrder,
     selectedCustomer,
     selectedLocation,
@@ -444,6 +555,9 @@ const NewOrder = () => {
     navigate,
     success,
     error,
+    isMan,
+    obedSumma,
+    updateCustomer,
   ]);
 
   if (saved) {
@@ -456,9 +570,6 @@ const NewOrder = () => {
           <h2 className="text-3xl font-bold text-navy-900 dark:text-white mb-1">
             Saqlandi!
           </h2>
-          {/* <p className="text-gray-500 text-lg">
-            {effectiveQty} ta {selectedKebab?.name}
-          </p> */}
         </div>
       </div>
     );
@@ -568,7 +679,7 @@ const NewOrder = () => {
 
           {activeTab === "customers" && (
             <div className="px-4 pb-4 space-y-3">
-              {/* 🌟 JONLI QIDIRUV INPUT MAYDONI (Vaqtni tejash uchun eng muhim qism) */}
+              {/* JONLI QIDIRUV INPUT MAYDONI (Vaqtni tejash uchun eng muhim qism) */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <input
@@ -593,7 +704,7 @@ const NewOrder = () => {
                   Hozircha mijoz yo'q
                 </p>
               ) : (
-                /* 🌟 FILTERLASH VA SARALASH MANTIQI: Kiritilgan harfga ko'ra darhol elakdan o'tkazadi */
+                /* FILTERLASH VA SARALASH MANTIQI: Kiritilgan harfga ko'ra darhol elakdan o'tkazadi */
                 (() => {
                   const filtered = customers
                     .filter((c) =>
@@ -811,7 +922,41 @@ const NewOrder = () => {
             </div>
           </div>
         )}
+        {isMan && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-3 border border-orange-100 dark:border-orange-950/40">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-navy-900 dark:text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                Savdo pulidan olingan pul (Obed)
+              </h2>
+              <span className="text-xs font-semibold text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 px-2 py-1 rounded-lg">
+                Nasiyaga yoziladi
+              </span>
+            </div>
 
+            <div className="relative flex items-center justify-between bg-gray-50/50 dark:bg-gray-700/30 rounded-2xl px-4 py-3 border border-gray-100 dark:border-gray-700 shadow-inner focus-within:ring-2 focus-within:ring-orange-400 focus-within:border-transparent transition-all">
+              <input
+                type="number"
+                pattern="[0-9]*"
+                inputMode="numeric"
+                placeholder="20000"
+                value={obedSumma}
+                onChange={(e) => setObedSumma(e.target.value)}
+                className="w-full text-md font-bold bg-transparent text-navy-900 dark:text-white outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
+              />
+              <span className="text-xl font-black text-gray-400 dark:text-gray-500 ml-2 tracking-wide uppercase select-none">
+                so'm
+              </span>
+            </div>
+
+            <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 pl-1">
+              * Ushbu xarajat summasi jami naqd savdo pulidan (kassadan)
+              avtomatik chegiriladi.
+            </p>
+          </div>
+        )}
+
+        {/* KABOB TURI VA MIQDORI DOIM KO'RINIB TURADI */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-6">
           <h2 className="text-base font-bold text-navy-900 dark:text-white">
             2. Nechta va Qanaqa?
@@ -819,7 +964,6 @@ const NewOrder = () => {
 
           <div className="space-y-6">
             {orderItems.map((item, index) => {
-              // Har bir shashlik uchun tanlangan tur va miqdor
               const selectedKebabId = item.kebab?.id;
 
               return (
@@ -950,61 +1094,64 @@ const NewOrder = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
-          <h2 className="text-base font-bold text-navy-900 dark:text-white mb-3">
-            Buyurtma hisoboti
-          </h2>
+        {!isMan && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
+            <h2 className="text-base font-bold text-navy-900 dark:text-white mb-3">
+              Buyurtma hisoboti
+            </h2>
 
-          <div className="space-y-2.5">
-            {/* 1. Mijoz yoki Joy nomi */}
-            <div className="flex justify-between items-start">
-              <span className="text-sm text-gray-500 mt-0.5">Mijoz/Joy</span>
-              <span className="text-sm font-semibold text-navy-900 dark:text-white text-right max-w-[60%] break-words">
-                {selectedCustomer?.name ||
-                  (addLocToTavsif
-                    ? tavsifLocation?.label
-                    : selectedLocation?.label) ||
-                  tavsif.trim() ||
-                  "—"}
-              </span>
-            </div>
+            <div className="space-y-2.5">
+              {/* 1. Mijoz yoki Joy nomi */}
+              <div className="flex justify-between items-start">
+                <span className="text-sm text-gray-500 mt-0.5">Mijoz/Joy</span>
+                <span className="text-sm font-semibold text-navy-900 dark:text-white text-right max-w-[60%] break-words">
+                  {selectedCustomer?.name ||
+                    (addLocToTavsif
+                      ? tavsifLocation?.label
+                      : selectedLocation?.label) ||
+                    tavsif.trim() ||
+                    "—"}
+                </span>
+              </div>
 
-            {/* 2. Shashlik turi va har biridan nechta olingani */}
-            <div className="flex justify-between items-start">
-              <span className="text-sm text-gray-500 mt-0.5">
-                Shashlik turi va miqdori
-              </span>
-              <div className="text-right space-y-1">
-                {orderItems.map((item, i) => (
-                  <div
-                    key={i}
-                    className="text-sm font-semibold text-navy-900 dark:text-white"
-                  >
-                    {item.qty} ta {item.kebab?.name || "Noma'lum"}
-                  </div>
-                ))}
+              {/* 2. Shashlik turi va har biridan nechta olingani */}
+              <div className="flex justify-between items-start">
+                <span className="text-sm text-gray-500 mt-0.5">
+                  Shashlik turi va miqdori
+                </span>
+                <div className="text-right space-y-1">
+                  {orderItems.map((item, i) => (
+                    <div
+                      key={i}
+                      className="text-sm font-semibold text-navy-900 dark:text-white"
+                    >
+                      {item.qty} ta {item.kebab?.name || "Noma'lum"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Umumiy miqdor (Jami shashliklar soni) */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Umumiy miqdor</span>
+                <span className="text-sm font-bold text-navy-900 dark:text-white">
+                  {orderItems.reduce((sum, item) => sum + (item.qty || 0), 0)}{" "}
+                  ta
+                </span>
+              </div>
+
+              {/* 4. Jami kassa summasi */}
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-2.5 flex justify-between items-baseline">
+                <span className="text-base font-bold text-navy-900 dark:text-white">
+                  Jami summasi
+                </span>
+                <span className="text-2xl font-extrabold text-primary-500">
+                  {formatCurrency(totalPrice)}
+                </span>
               </div>
             </div>
-
-            {/* 3. Umumiy miqdor (Jami shashliklar soni) */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">Umumiy miqdor</span>
-              <span className="text-sm font-bold text-navy-900 dark:text-white">
-                {orderItems.reduce((sum, item) => sum + (item.qty || 0), 0)} ta
-              </span>
-            </div>
-
-            {/* 4. Jami kassa summasi */}
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-2.5 flex justify-between items-baseline">
-              <span className="text-base font-bold text-navy-900 dark:text-white">
-                Jami summasi
-              </span>
-              <span className="text-2xl font-extrabold text-primary-500">
-                {formatCurrency(totalPrice)}
-              </span>
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="px-4 pt-6 z-20 mt-4">

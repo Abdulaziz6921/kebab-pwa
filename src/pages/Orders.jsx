@@ -280,10 +280,9 @@ const Orders = () => {
     .filter((o) => o.paid && isToday(o.createdAt))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  // 3. ─── 🛠️ NASIYALAR FILTRINI XAVFSIZ QILAMIZ ───
-  // Faqat TO'LANMAGAN (paid: false) va isDebt: true bo'lgan buyurtmalargina Nasiya bo'lib qoladi!
+  // 3. Faqat TO'LANMAGAN (paid: false) va isDebt: true bo'lgan buyurtmalargina Nasiya bo'lib qoladi!
   const debtOrders = orders
-    .filter((o) => !o.paid && (o.isDebt || !isToday(o.createdAt))) // !o.paid sharti boshiga qo'shildi
+    .filter((o) => !o.paid && (o.isDebt || !isToday(o.createdAt)))
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const displayOrders = (
@@ -317,12 +316,10 @@ const Orders = () => {
 
     setPaying(order.id);
     try {
-      // ─── 🛠️ MUHIM TUZATISH: markOrderPaid o'rniga updateOrder dan foydalanamiz ───
-      // Bu orqali paid: true bo'lishi bilan birga isDebt ham aniq false bo'ladi va Firebase-ga ketadi
       await updateOrder(order.id, {
         paid: true,
         paidAt: Date.now(),
-        isDebt: false, // Nasiyalar ro'yxatidan o'chirish sharti
+        isDebt: false,
       });
 
       success("To'lov qabul qilindi");
@@ -351,12 +348,10 @@ const Orders = () => {
           break;
 
         case "markPaid":
-          // 1. To'lov qilinganda, agar u oldin nasiya bo'lsa, isDebt false bo'lishi shart.
-          // Agar context ichidagi markOrderPaid buni avtomat qilmasa, updateOrder bilan isDebt ni o'chiramiz:
           await updateOrder(order.id, {
             paid: true,
             paidAt: Date.now(),
-            isDebt: false, // To'langani uchun nasiya holati o'chadi
+            isDebt: false,
           });
           success("Buyurtma to'langan deb belgilandi");
           break;
@@ -371,7 +366,7 @@ const Orders = () => {
           break;
 
         case "toNasiya":
-          // 🌟 Buyurtmani nasiyaga o'tkazishda isDebt true qilinadi
+          // Buyurtmani nasiyaga o'tkazishda isDebt true qilinadi
           await updateOrder(order.id, {
             paid: false,
             paidAt: null,
@@ -532,7 +527,7 @@ const Orders = () => {
                 : `${todayDateStr} uchun to'langan buyurtmalar yo'q`}
           </div>
         ) : activeTab === "debt" ? (
-          /* 🌟 1. NASIYALAR TABI UCHUN: Mahalliy xavfsiz guruhlash mantiqi */
+          /*  1. NASIYALAR TABI UCHUN: Mahalliy xavfsiz guruhlash mantiqi */
           (() => {
             // Nasiyalarni sanasi bo'yicha guruhlaymiz
             const groups = {};
@@ -551,7 +546,7 @@ const Orders = () => {
             // Guruhlangan ma'lumotni JSX formatida chiqaramiz
             return Object.entries(groups).map(([dateLabel, ordersInGroup]) => (
               <div key={dateLabel} className="space-y-2">
-                {/* 🌟 Kalendar ikonka va chiroyli sana sarlavhasi */}
+                {/*  Kalendar ikonka va chiroyli sana sarlavhasi */}
                 <div className="flex items-center gap-2 text-navy-900 dark:text-white font-bold text-sm px-1 py-1 mt-3">
                   <svg
                     viewBox="0 0 24 24"
@@ -594,7 +589,7 @@ const Orders = () => {
             ));
           })()
         ) : (
-          /* 🌟 2. TO'LANMAGAN VA TO'LANGAN TABLAR UCHUN: Oddiy o'zingizning eski tartibingiz */
+          /* 2. TO'LANMAGAN VA TO'LANGAN TABLAR UCHUN: Oddiy tartib */
           displayOrders.map((order) => (
             <div
               key={order.id}

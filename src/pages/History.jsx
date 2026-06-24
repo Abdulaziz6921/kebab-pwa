@@ -255,7 +255,7 @@ const History = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // 1. FILTERED ORDERS
+  // 1. FILTERED ORDERS: Clean and raw database entries (No hidden paid/price hacks)
   const filteredOrders = useMemo(() => {
     const today = dayStart(Date.now());
     const limits = { today: 0, week: 6 * 86400000, month: 29 * 86400000 };
@@ -265,48 +265,34 @@ const History = () => {
       ? orders.filter((o) => o.createdAt >= limitDate)
       : orders;
 
-    return periodOrders.map((o) => {
-      if (o.isObed) {
-        const hasNoKebab = !o.items || o.items.length === 0;
-        return {
-          ...o,
-          quantity: hasNoKebab ? 0 : Number(o.quantity || 1),
-          paid: hasNoKebab ? true : false,
-          isDebt: hasNoKebab ? false : true,
-          totalPrice: Number(o.totalPrice || 0),
-        };
-      }
-      return o;
-    });
+    return periodOrders.map((o) => ({
+      ...o,
+      totalPrice: Number(o.totalPrice || 0), // Keeps original database values untouched
+    }));
   }, [orders, filter]);
 
-  // 2. DAY GROUPS
+  // 2. DAY GROUPS: Group entries by day and apply seamless dynamic deduction rules
   const dayGroups = useMemo(() => {
     const groups = groupOrdersByDay(filteredOrders);
 
     return groups.map((group) => {
-      const firstOrder = group.orders && group.orders[0];
-      const groupDateKey = firstOrder
-        ? getLocalDateKey(firstOrder.createdAt)
-        : getLocalDateKey(Date.now());
+      // 1. Extract obedience (Man) entries strictly for this specific day's slice
+      const dayObedOrders = group.orders.filter((o) => o.isObed);
 
-      // Find all obedience entries strictly for this specific day
-      const dayObedOrders = filteredOrders.filter(
-        (o) => o.isObed && getLocalDateKey(o.createdAt) === groupDateKey,
-      );
-
-      // Cash taken from register strictly (e.g., 5,000 or 20,000)
+      // Total money taken from register as cash expenses (e.g., 5,000 or 20,000)
       const dayObedCash = dayObedOrders.reduce(
         (sum, o) => sum + (o.debtAmount || 0),
         0,
       );
 
-      // Kebab debt eaten on this day (e.g., 15,000 or 0)
+      // Kebab price eaten strictly by you on this day (e.g., 20,000 - 5,000 = 15,000)
       const dayObedKebab = dayObedOrders.reduce((sum, o) => {
         return sum + ((o.totalPrice || 0) - (o.debtAmount || 0));
       }, 0);
 
-      // Calculate gross paid revenue from real customers only (excludes obedience entries)
+      // 🌟 FIXED GROSS REVENUE BASELINE:
+      // Calculate true cash from regular customers who PAID (paid: true).
+      // We COMPLETELY BYPASS "Man" (isObed) entries to avoid baseline contamination bugs.
       const rawPaidRevenue = group.orders
         .filter((o) => o.paid && !o.isObed)
         .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
@@ -316,19 +302,27 @@ const History = () => {
         (o) => !(o.isObed && (!o.items || o.items.length === 0)),
       );
 
-      let finalRevenue = rawPaidRevenue - dayObedCash;
-      if (groupDateKey === getLocalDateKey(Date.now())) {
-        finalRevenue = finalRevenue - dayObedKebab;
-      }
+      const realPaidOrders = realDayOrders.filter((o) => o.paid);
+      const realUnpaidOrders = realDayOrders.filter((o) => !o.paid);
+
+      // 🟢 THE ULTIMATE CASH EQUATION:
+      // Real customer paid cash minus overall lunch expenses (cash + kebab).
+      // If you input 1 kebab + 5k today -> gross baseline drops by exactly 20,000!
+      // If it's a historical day where kebab wasn't in baseline, it balances perfectly.
+      const finalRevenue = rawPaidRevenue - dayObedCash - dayObedKebab;
 
       return {
         ...group,
         revenue: finalRevenue,
-        total: realDayOrders.length,
+
+        // 🌟 YANGILANDI: realDayOrders o'rniga group.orders qo'yildi!
+        // Endi faqat 20000 so'm kiritilganda ham u Tarix ro'yxatida (Order List) chiroyli chiqib turadi!
+        orders: group.orders,
+
+        total: realDayOrders.length, // Tepadagi Jami hisoblagichda baribir 0 ta deb hisoblanadi
         ordersCount: realDayOrders.length,
-        paidCount: realDayOrders.filter((o) => o.paid).length,
-        unpaidCount:
-          realDayOrders.length - realDayOrders.filter((o) => o.paid).length,
+        paidCount: realPaidOrders.length,
+        unpaidCount: realUnpaidOrders.length,
       };
     });
   }, [filteredOrders]);

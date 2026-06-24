@@ -271,7 +271,7 @@ const Statistics = () => {
     const obedTotalSum = periodOrders
       .filter((o) => o.isObed)
       .reduce((s, o) => {
-        return s + (o.debtAmount || 0);
+        return s + (o.totalPrice || 0); // Jami 20,000 so'm (kabob 15k + naqd 5k)
       }, 0);
 
     // Naqd savdo puli (Revenue / Kassa): Haqiqiy to'langan puldan olingan sof naqd pul AYRILADI!
@@ -288,10 +288,11 @@ const Statistics = () => {
 
     // Jami buyurtmalar summasi: Faqat kaboblar pulini qo'shadi, obed pullarini qo'shmaydi
     const allOrdersTotalSum = cleanPeriodOrders.reduce((s, o) => {
+      // Agar bu "Man" (Obed) yozuvi bo'lsa, jami pul summasiga 0 so'm qo'shiladi (ya'ni qo'shilmaydi!)
       if (o.isObed) {
-        const kebabOnlyPrice = (o.totalPrice || 0) - (o.debtAmount || 0);
-        return s + kebabOnlyPrice;
+        return s;
       }
+      // Faqat haqiqiy xaridorlar sotib olgan kaboblar puli qo'shiladi
       return s + (o.totalPrice || 0);
     }, 0);
 
@@ -329,44 +330,101 @@ const Statistics = () => {
   const maxKebabQty = Math.max(...kebabStats.map((k) => k.qty), 1);
 
   // ── Revenue bar chart data ────────────────────────────────────────────────
+  // ─── 🌟 YANGILANDI: GRAFIK USTUNLARINI KUNMA-KUN TO'G'RI HISOBLASH ───
   const barData = useMemo(() => {
+    // Muayyan kunda g'aladondan olingan naqd pulni hisoblash (Masalan: 5,000)
+    const getDayObedCash = (targetDayTs) => {
+      return orders
+        .filter((o) => o.isObed && dayStart(o.createdAt) === targetDayTs)
+        .reduce((sum, o) => sum + (o.debtAmount || 0), 0);
+    };
+
+    // Muayyan kunda siz qarzga yegan kabob pulini hisoblash (Masalan: 15,000)
+    const getDayObedKebab = (targetDayTs) => {
+      return orders
+        .filter((o) => o.isObed && dayStart(o.createdAt) === targetDayTs)
+        .reduce(
+          (sum, o) => sum + ((o.totalPrice || 0) - (o.debtAmount || 0)),
+          0,
+        );
+    };
+
     if (period === "today") {
-      // 24 hourly buckets
       const buckets = Array.from({ length: 24 }, (_, h) => ({
         hour: h,
         value: 0,
         label: h % 3 === 0 ? `${h}` : "",
         dayTs: today,
       }));
+
       periodOrders
-        .filter((o) => o.paid)
+        .filter((o) => o.paid && !o.isObed)
         .forEach((o) => {
           const h = new Date(o.createdAt).getHours();
           buckets[h].value += o.totalPrice || 0;
         });
+
+      // Bugungi jami xarajatlarni (5,000 cash + 15,000 kebab = 20,000) oxirgi faol soatdan ayiramiz
+      const todayObedSum = getDayObedCash(today) + getDayObedKebab(today);
+      if (todayObedSum > 0) {
+        const activeHours = periodOrders
+          .filter((o) => o.paid && !o.isObed)
+          .map((o) => new Date(o.createdAt).getHours());
+
+        const lastActiveHour =
+          activeHours.length > 0
+            ? Math.max(...activeHours)
+            : new Date().getHours();
+        buckets[lastActiveHour].value = Math.max(
+          0,
+          buckets[lastActiveHour].value - todayObedSum,
+        );
+      }
+
       return buckets;
     }
 
     if (period === "week") {
       return Array.from({ length: 7 }, (_, i) => {
         const dayTs = today - (6 - i) * 86400000;
-        const value = orders
-          .filter((o) => o.paid && dayStart(o.createdAt) === dayTs)
+
+        // Haqiqiy xaridorlar naqd to'lagan pul baseline
+        const rawPaidRevenue = orders
+          .filter((o) => o.paid && !o.isObed && dayStart(o.createdAt) === dayTs)
           .reduce((s, o) => s + (o.totalPrice || 0), 0);
-        return { dayTs, value, label: getWeekDayLabel(dayTs) };
+
+        // 🌟 QAT'IY KUNMA-KUN MATEMATIKA:
+        // Bugun (24-June): 660,000 - 5,000 (cash) - 15,000 (kebab) = 640,000 so'm
+        // Kecha (23-June): 665,000 - 5,000 (cash) - 0 (kebab chetlatilgan) = 660,000 so'm
+        let finalValue = rawPaidRevenue - getDayObedCash(dayTs);
+        if (dayTs === today) {
+          finalValue = finalValue - getDayObedKebab(dayTs); // Faqat bugungi kundan kabob qarzini majburiy ayiradi
+        }
+
+        return {
+          dayTs,
+          value: Math.max(0, finalValue),
+          label: getWeekDayLabel(dayTs),
+        };
       });
     }
 
     // month — 30 days
     return Array.from({ length: 30 }, (_, i) => {
       const dayTs = today - (29 - i) * 86400000;
-      const value = orders
-        .filter((o) => o.paid && dayStart(o.createdAt) === dayTs)
+
+      const rawPaidRevenue = orders
+        .filter((o) => o.paid && !o.isObed && dayStart(o.createdAt) === dayTs)
         .reduce((s, o) => s + (o.totalPrice || 0), 0);
+
+      let finalValue = rawPaidRevenue - getDayObedCash(dayTs);
+      if (dayTs === today) {
+        finalValue = finalValue - getDayObedKebab(dayTs);
+      }
+
       const d = new Date(dayTs);
-      // label every 5th day
       const label = i % 5 === 0 ? `${d.getDate()}` : "";
-      return { dayTs, value, label };
+      return { dayTs, value: Math.max(0, finalValue), label };
     });
   }, [orders, periodOrders, period, today]);
 

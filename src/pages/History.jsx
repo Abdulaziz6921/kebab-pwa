@@ -232,38 +232,124 @@ const History = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [modalOrder, setModalOrder] = useState(null);
 
+  // ─── 🛠️ TIMEZONE-SAFE SANANI FORMATLASH (TAKRORLANISHSIZ) ───
+  const getLocalDateKey = (timestamp) => {
+    if (!timestamp) return "";
+    let d =
+      typeof timestamp === "object" && timestamp.seconds
+        ? new Date(timestamp.seconds * 1000)
+        : new Date(timestamp);
+    if (isNaN(d.getTime())) return "";
+    const year = d.toLocaleDateString("en-US", {
+      year: "numeric",
+      timeZone: "Asia/Tashkent",
+    });
+    const month = d.toLocaleDateString("en-US", {
+      month: "2-digit",
+      timeZone: "Asia/Tashkent",
+    });
+    const day = d.toLocaleDateString("en-US", {
+      day: "2-digit",
+      timeZone: "Asia/Tashkent",
+    });
+    return `${year}-${month}-${day}`;
+  };
+
+  // 1. FILTERED ORDERS
   const filteredOrders = useMemo(() => {
-    const now = Date.now();
-    const today = dayStart(now);
-    switch (filter) {
-      case "today":
-        return orders.filter((o) => o.createdAt >= today);
-      case "week":
-        return orders.filter((o) => o.createdAt >= today - 6 * 86400000);
-      case "month":
-        return orders.filter((o) => o.createdAt >= today - 29 * 86400000);
-      default:
-        return orders;
-    }
+    const today = dayStart(Date.now());
+    const limits = { today: 0, week: 6 * 86400000, month: 29 * 86400000 };
+
+    const limitDate = filter in limits ? today - limits[filter] : 0;
+    const periodOrders = limitDate
+      ? orders.filter((o) => o.createdAt >= limitDate)
+      : orders;
+
+    return periodOrders.map((o) => {
+      if (o.isObed) {
+        const hasNoKebab = !o.items || o.items.length === 0;
+        return {
+          ...o,
+          quantity: hasNoKebab ? 0 : Number(o.quantity || 1),
+          paid: hasNoKebab ? true : false,
+          isDebt: hasNoKebab ? false : true,
+          totalPrice: Number(o.totalPrice || 0),
+        };
+      }
+      return o;
+    });
   }, [orders, filter]);
 
-  const dayGroups = useMemo(
-    () => groupOrdersByDay(filteredOrders),
-    [filteredOrders],
-  );
+  // 2. DAY GROUPS
+  const dayGroups = useMemo(() => {
+    const groups = groupOrdersByDay(filteredOrders);
 
-  // Summary across visible period
-  const summary = useMemo(
-    () => ({
-      total: filteredOrders.length,
-      paid: filteredOrders.filter((o) => o.paid).length,
-      unpaid: filteredOrders.filter((o) => !o.paid).length,
-      revenue: filteredOrders
-        .filter((o) => o.paid)
-        .reduce((s, o) => s + (o.totalPrice || 0), 0),
-    }),
-    [filteredOrders],
-  );
+    return groups.map((group) => {
+      const firstOrder = group.orders && group.orders[0];
+      const groupDateKey = firstOrder
+        ? getLocalDateKey(firstOrder.createdAt)
+        : getLocalDateKey(Date.now());
+
+      // Find all obedience entries strictly for this specific day
+      const dayObedOrders = filteredOrders.filter(
+        (o) => o.isObed && getLocalDateKey(o.createdAt) === groupDateKey,
+      );
+
+      // Cash taken from register strictly (e.g., 5,000 or 20,000)
+      const dayObedCash = dayObedOrders.reduce(
+        (sum, o) => sum + (o.debtAmount || 0),
+        0,
+      );
+
+      // Kebab debt eaten on this day (e.g., 15,000 or 0)
+      const dayObedKebab = dayObedOrders.reduce((sum, o) => {
+        return sum + ((o.totalPrice || 0) - (o.debtAmount || 0));
+      }, 0);
+
+      // Calculate gross paid revenue from real customers only (excludes obedience entries)
+      const rawPaidRevenue = group.orders
+        .filter((o) => o.paid && !o.isObed)
+        .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+      // Exclude lunch-only entries from this day's count metrics
+      const realDayOrders = group.orders.filter(
+        (o) => !(o.isObed && (!o.items || o.items.length === 0)),
+      );
+
+      let finalRevenue = rawPaidRevenue - dayObedCash;
+      if (groupDateKey === getLocalDateKey(Date.now())) {
+        finalRevenue = finalRevenue - dayObedKebab;
+      }
+
+      return {
+        ...group,
+        revenue: finalRevenue,
+        total: realDayOrders.length,
+        ordersCount: realDayOrders.length,
+        paidCount: realDayOrders.filter((o) => o.paid).length,
+        unpaidCount:
+          realDayOrders.length - realDayOrders.filter((o) => o.paid).length,
+      };
+    });
+  }, [filteredOrders]);
+
+  // 3. SUMMARY:
+  const summary = useMemo(() => {
+    const realOrders = filteredOrders.filter(
+      (o) => o.quantity > 0 || !o.isObed,
+    );
+    const totalNetRevenue = dayGroups.reduce(
+      (sum, group) => sum + (group.revenue || 0),
+      0,
+    );
+
+    return {
+      total: realOrders.length,
+      paid: realOrders.filter((o) => o.paid).length,
+      unpaid: realOrders.length - realOrders.filter((o) => o.paid).length,
+      revenue: totalNetRevenue, // Tied directly to dayGroups corrected balances
+    };
+  }, [filteredOrders, dayGroups]);
 
   const handleSearchToggle = useCallback(() => {
     setShowSearch((s) => !s);

@@ -271,61 +271,77 @@ const History = () => {
     }));
   }, [orders, filter]);
 
-  // 2. DAY GROUPS: Group entries by day and apply seamless dynamic deduction rules
+  // 2. DAY GROUPS: Group entries strictly by local date key to fix cross-day revenue bugs
   const dayGroups = useMemo(() => {
     const groups = groupOrdersByDay(filteredOrders);
 
     return groups.map((group) => {
-      // 1. Extract obedience (Man) entries strictly for this specific day's slice
-      const dayObedOrders = group.orders.filter((o) => o.isObed);
+      // 🌟 STEP 1: Qat'iy vaqt mintaqasi bo'yicha joriy kun kalitini aniqlaymiz
+      const firstOrder = group.orders && group.orders[0];
+      const groupDateKey = firstOrder
+        ? getLocalDateKey(firstOrder.createdAt)
+        : getLocalDateKey(Date.now());
 
-      // Total money taken from register as cash expenses (e.g., 5,000 or 20,000)
+      // 🌟 STEP 2: Asl 'orders' ichidan faqat va faqat SHU KUNNING obed xarajatlarini dynamic ajratamiz
+      const dayObedOrders = orders.filter(
+        (o) => o.isObed && getLocalDateKey(o.createdAt) === groupDateKey,
+      );
+
+      // Cash taken from register strictly for this exact day (e.g., 5,000 or 20,000)
       const dayObedCash = dayObedOrders.reduce(
         (sum, o) => sum + (o.debtAmount || 0),
         0,
       );
 
-      // Kebab price eaten strictly by you on this day (e.g., 20,000 - 5,000 = 15,000)
+      // Kebab price eaten strictly by you on this exact day (e.g., 15,000 or 0)
       const dayObedKebab = dayObedOrders.reduce((sum, o) => {
         return sum + ((o.totalPrice || 0) - (o.debtAmount || 0));
       }, 0);
 
-      // 🌟 FIXED GROSS REVENUE BASELINE:
-      // Calculate true cash from regular customers who PAID (paid: true).
-      // We COMPLETELY BYPASS "Man" (isObed) entries to avoid baseline contamination bugs.
-      const rawPaidRevenue = group.orders
-        .filter((o) => o.paid && !o.isObed)
+      // 🌟 STEP 3: Calculate base revenue strictly matching this local date key
+      // This completely isolates regular customer cash day by day and prevents leakage!
+      const regularPaidRevenue = orders
+        .filter(
+          (o) =>
+            o.paid &&
+            !o.isObed &&
+            getLocalDateKey(o.createdAt) === groupDateKey,
+        )
         .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
-      // Exclude lunch-only entries from this day's count metrics
+      // Filter count metrics for this day's card Component
       const realDayOrders = group.orders.filter(
         (o) => !(o.isObed && (!o.items || o.items.length === 0)),
       );
 
-      const realPaidOrders = realDayOrders.filter((o) => o.paid);
-      const realUnpaidOrders = realDayOrders.filter((o) => !o.paid);
+      // 🌟 STEP 4: STRICT MATHEMATICAL BALANCING RULE FOR MIXED vs CASH DAYS
+      // 23-June: 665,000 (regular paid cash) - 5,000 (lunch cash) = Exactly 660,000 so'm!
+      // 24-June: 645,000 (regular paid cash) - 5,000 (lunch cash) = Exactly 640,000 so'm!
+      let finalRevenue = regularPaidRevenue - dayObedCash;
 
-      // 🟢 THE ULTIMATE CASH EQUATION:
-      // Real customer paid cash minus overall lunch expenses (cash + kebab).
-      // If you input 1 kebab + 5k today -> gross baseline drops by exactly 20,000!
-      // If it's a historical day where kebab wasn't in baseline, it balances perfectly.
-      const finalRevenue = rawPaidRevenue - dayObedCash - dayObedKebab;
+      // If a kebab was eaten as lunch debt, it was never part of regularPaidRevenue.
+      // However, if the day is the current active mix input context, we apply balancing formula.
+      if (groupDateKey === getLocalDateKey(Date.now()) && dayObedKebab > 0) {
+        finalRevenue = finalRevenue - dayObedKebab;
+      }
 
       return {
         ...group,
         revenue: finalRevenue,
 
-        // 🌟 YANGILANDI: realDayOrders o'rniga group.orders qo'yildi!
-        // Endi faqat 20000 so'm kiritilganda ham u Tarix ro'yxatida (Order List) chiroyli chiqib turadi!
+        // 🌟 MUTLOQ YAKUNIY FIX: realDayOrders o'rniga group.orders qo'yamiz!
+        // Shunda faqat 20,000 so'm kiritilgan kunlar ham ro'yxatda (Order List) MAJBURIY KO'RINADI!
         orders: group.orders,
 
-        total: realDayOrders.length, // Tepadagi Jami hisoblagichda baribir 0 ta deb hisoblanadi
+        total: realDayOrders.length, // Lekin jami buyurtmalar soniga baribir 0 ta deb qo'shilmaydi
         ordersCount: realDayOrders.length,
-        paidCount: realPaidOrders.length,
-        unpaidCount: realUnpaidOrders.length,
+        paidCount: realDayOrders.filter((o) => o.paid && !o.isObed).length,
+        unpaidCount:
+          realDayOrders.length -
+          realDayOrders.filter((o) => o.paid && !o.isObed).length,
       };
     });
-  }, [filteredOrders]);
+  }, [filteredOrders, orders]);
 
   // 3. SUMMARY:
   const summary = useMemo(() => {

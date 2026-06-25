@@ -1,7 +1,19 @@
 import { useState, useMemo } from "react";
 import { useOrders } from "../contexts";
-import { formatCurrency, formatRevenue } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatRevenue,
+  formatOrderTime,
+} from "../utils/formatters";
 import { dayStart } from "../utils/orderDisplay";
+import {
+  CheckCheck,
+  File,
+  FileText,
+  MinusSquare,
+  SquarePlus,
+  X,
+} from "lucide-react";
 
 // ─── SVG Donut Chart ──────────────────────────────────────────────────────────
 function DonutChart({ paid, total, size = 148 }) {
@@ -138,47 +150,74 @@ function RevenueBarChart({ data, label }) {
   );
 }
 
+//  ORDER DETAILS HELPER FUNCTION
+function getOrderSecondary(order) {
+  if (order.isObed) {
+    return "";
+  }
+
+  // New orders (Regular customers)
+  if (order.items?.length) {
+    return order.items
+      .map((item) => `${item.quantity} ta ${item.kebabName}`)
+      .join(", ");
+  }
+
+  // Backward compatibility for old orders (Regular customers)
+  const kebabMap = {
+    qiyma: "Qiyma",
+    mol: "Mol go'shti",
+    quy: "Qo'y go'shti",
+  };
+
+  const kebab = kebabMap[order.kebabType] || order.kebabType || "";
+  return `${order.quantity || 1} ta ${kebab}`;
+}
+
 // ─── Metric card ───
 function MetricCard({ label, value, sub, accent, className }) {
-  const bgClass = className
-    ? className
-    : accent
-      ? "bg-navy-800 text-white"
-      : "bg-white dark:bg-gray-800 text-navy-900 dark:text-white";
+  const isCustomBg = !!className;
+  const baseCardStyles =
+    "rounded-2xl p-3.5 sm:p-4 shadow-sm border border-gray-100/50 dark:border-gray-700/30 transition-all select-none";
+
+  const theme = {
+    bg:
+      className ||
+      (accent
+        ? "bg-navy-800 text-white"
+        : "bg-white dark:bg-gray-800 text-navy-900 dark:text-white"),
+    label: isCustomBg
+      ? "text-white/75"
+      : accent
+        ? "text-navy-200/90"
+        : "text-gray-400 dark:text-gray-400",
+    value:
+      isCustomBg || accent ? "text-white" : "text-navy-900 dark:text-white",
+    sub: isCustomBg
+      ? "text-white/85"
+      : accent
+        ? "text-navy-300"
+        : "text-gray-400 dark:text-gray-500",
+  };
 
   return (
-    <div className={`rounded-2xl p-4 shadow-sm ${bgClass}`}>
+    <div className={`${baseCardStyles} ${theme.bg}`}>
       <p
-        className={`text-xs font-semibold mb-1 ${
-          className
-            ? "text-white/80"
-            : accent
-              ? "text-navy-200"
-              : "text-gray-400"
-        }`}
+        className={`text-[11px] sm:text-xs font-bold tracking-wide mb-1 uppercase opacity-90 ${theme.label}`}
       >
         {label}
       </p>
+
       <p
-        className={`text-xl font-extrabold leading-tight ${
-          className
-            ? "text-white"
-            : accent
-              ? "text-white"
-              : "text-navy-900 dark:text-white"
-        }`}
+        className={`text-base sm:text-lg md:text-xl font-black tracking-tight leading-none ${theme.value}`}
       >
         {value}
       </p>
+
+      {/* 🟢 TO'G'RILANDI: Ortiqcha qavslar olib tashlandi, endi xato bermaydi */}
       {sub && (
         <p
-          className={`text-xs mt-1 ${
-            className
-              ? "text-white/90"
-              : accent
-                ? "text-navy-300"
-                : "text-gray-400"
-          }`}
+          className={`text-[10px] sm:text-xs font-medium mt-1.5 truncate ${theme.sub}`}
         >
           {sub}
         </p>
@@ -215,6 +254,8 @@ function getWeekDayLabel(ts) {
 const Statistics = () => {
   const { orders } = useOrders();
   const [period, setPeriod] = useState("today");
+  const [activeMetricFilter, setActiveMetricFilter] = useState(" ");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const now = Date.now();
   const today = dayStart(now);
@@ -278,10 +319,7 @@ const Statistics = () => {
     const revenue =
       paid.reduce((s, o) => s + (o.totalPrice || 0), 0) - obedTotalSum;
 
-    const pendingRev = pendingOrders.reduce(
-      (s, o) => s + (o.totalPrice || 0),
-      0,
-    );
+    const paidTotalSum = paid.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
     // Nasiya (Qarzlar): "Man"ning hamma qarzi (kabob + naqd pul) to'liq qo'shiladi
     const debtTotal = debtOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
@@ -298,39 +336,97 @@ const Statistics = () => {
 
     return {
       revenue,
-      pendingRev,
+      paidTotalSum,
       debtTotal,
       allOrdersTotalSum,
-
       //  Endi faqat pul kiritilganda buyurtma soni mutloq oshmaydi va toza chiqadi!
       total: cleanPeriodOrders.length,
-
       paid: paid.length,
       pendingCount: pendingOrders.length,
       debtCount: debtOrders.length,
     };
   }, [periodOrders]);
 
+  // ─── 🌟 MANA SHU YERGA JURIDIK REJADA JOYLASHTIRING ───
+  const displayedOrders = useMemo(() => {
+    const baseOrders = periodOrders.filter(
+      (o) => !(o.isObed && (!o.items || o.items.length === 0)),
+    );
+
+    const isToday = (date) => {
+      const d = new Date(date);
+      const today = new Date();
+      return (
+        d.getDate() === today.getDate() &&
+        d.getMonth() === today.getMonth() &&
+        d.getFullYear() === today.getFullYear()
+      );
+    };
+
+    switch (activeMetricFilter) {
+      case "paid":
+        return baseOrders.filter((o) => o.paid);
+      case "debt":
+        return periodOrders.filter(
+          (o) => o.isDebt || (!o.paid && !isToday(o.createdAt)),
+        );
+      case "revenue":
+        return periodOrders.filter((o) => o.paid || o.isObed);
+      case "all":
+      default:
+        return baseOrders;
+    }
+  }, [periodOrders, activeMetricFilter]);
+  // ───────────────────────────────────────────────────
+
   // ── Kebab quantities ──────────────────────────────────────────────────────
   const kebabStats = useMemo(() => {
-    return KEBAB_CONFIG.map((k) => ({
-      ...k,
-      qty: periodOrders.reduce((sum, order) => {
+    return KEBAB_CONFIG.map((k) => {
+      const qty = periodOrders.reduce((sum, order) => {
         if (!order.items) return sum;
+        return (
+          sum +
+          order.items
+            .filter((item) => item.kebabType === k.id)
+            .reduce((s, item) => s + (item.quantity || 0), 0)
+        );
+      }, 0);
 
-        const itemQty = order.items
-          .filter((item) => item.kebabType === k.id)
-          .reduce((s, item) => s + item.quantity, 0);
+      const debtQty = periodOrders.reduce((sum, order) => {
+        if (order.paid || order.isObed || !order.items) return sum;
+        return (
+          sum +
+          order.items
+            .filter((item) => item.kebabType === k.id)
+            .reduce((s, item) => s + (item.quantity || 0), 0)
+        );
+      }, 0);
 
-        return sum + itemQty;
-      }, 0),
-    }));
+      const paidQty = Math.max(0, qty - debtQty);
+
+      return {
+        ...k,
+        qty,
+        paidQty,
+        debtQty,
+      };
+    }).filter((k) => k.qty > 0); // Faqat sotilgan shashliklarni qoldiradi
   }, [periodOrders]);
 
-  const maxKebabQty = Math.max(...kebabStats.map((k) => k.qty), 1);
+  const maxKebabQty = useMemo(() => {
+    if (kebabStats.length === 0) return 1;
+    return Math.max(...kebabStats.map((k) => k.qty), 1);
+  }, [kebabStats]);
+
+  const kebabDistribution = useMemo(() => {
+    return kebabStats.map((k) => ({
+      ...k,
+      paidPct: maxKebabQty > 0 ? (k.paidQty / maxKebabQty) * 100 : 0,
+      debtPct: maxKebabQty > 0 ? (k.debtQty / maxKebabQty) * 100 : 0,
+    }));
+  }, [kebabStats, maxKebabQty]);
 
   // ── Revenue bar chart data ────────────────────────────────────────────────
-  // ─── 🌟 YANGILANDI: GRAFIK USTUNLARINI KUNMA-KUN TO'G'RI HISOBLASH ───
   const barData = useMemo(() => {
     // Muayyan kunda g'aladondan olingan naqd pulni hisoblash (Masalan: 5,000)
     const getDayObedCash = (targetDayTs) => {
@@ -466,23 +562,40 @@ const Statistics = () => {
       <div className="px-4 py-4 space-y-4">
         {/* ── Key metrics ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard
-            label="Jami buyurtma"
-            value={formatCurrency(metrics.allOrdersTotalSum)}
-            sub={`${metrics.total} ta umumiy buyurtma`}
-            accent
-          />
-
-          <div className="[&_*]:!text-white">
+          <div
+            onClick={() => {
+              setActiveMetricFilter("all");
+              setIsModalOpen(true);
+            }}
+          >
             <MetricCard
-              label="To'langan"
-              value={formatCurrency(metrics.revenue)}
-              sub={`${metrics.paid} ta buyurtma to'landi`}
-              className="!bg-green-500 dark:!bg-green-600"
+              label="Jami buyurtma"
+              value={formatCurrency(metrics.allOrdersTotalSum)}
+              sub={`${metrics.total} ta umumiy buyurtma`}
+              accent
             />
           </div>
 
-          <div className="[&_*]:!text-white">
+          <div
+            onClick={() => {
+              setActiveMetricFilter("paid");
+              setIsModalOpen(true);
+            }}
+          >
+            <MetricCard
+              label="To'langan"
+              value={formatCurrency(metrics.paidTotalSum)}
+              sub={`${metrics.paid} ta buyurtma to'landi`}
+              className="!bg-orange-500 dark:!bg-orange-600"
+            />
+          </div>
+
+          <div
+            onClick={() => {
+              setActiveMetricFilter("debt");
+              setIsModalOpen(true);
+            }}
+          >
             <MetricCard
               label="Nasiyalar"
               value={formatCurrency(metrics.debtTotal)}
@@ -491,12 +604,19 @@ const Statistics = () => {
             />
           </div>
 
-          <MetricCard
-            label="Kutilmoqda"
-            value={formatCurrency(metrics.pendingRev)}
-            sub={`${metrics.pendingCount} ta to'lanmagan`}
-            className="!bg-gray-500 dark:!bg-gray-600"
-          />
+          <div
+            onClick={() => {
+              setActiveMetricFilter("revenue");
+              setIsModalOpen(true);
+            }}
+          >
+            <MetricCard
+              label="Sof daromad"
+              value={formatCurrency(metrics.revenue)}
+              sub={`savdo puli bo'lishi kerak`}
+              className="!bg-green-500 dark:!bg-green-600"
+            />
+          </div>
         </div>
 
         {/* ── Kebab quantity revenue breakdown ─────────────────────────────────────── */}
@@ -504,20 +624,57 @@ const Statistics = () => {
           <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-4">
             Shashlik miqdori bo'yicha taqsimot
           </h3>
-          {kebabStats.every((k) => k.qty === 0) ? (
+
+          {kebabDistribution.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-4">
               Hali buyurtma yo'q
             </p>
           ) : (
             <div className="space-y-4">
-              {kebabStats.map((k) => (
-                <HBar
-                  key={k.id}
-                  label={k.label}
-                  value={k.qty}
-                  max={maxKebabQty}
-                  color={k.color}
-                />
+              {kebabDistribution.map((k) => (
+                <div key={k.id} className="space-y-1 select-none">
+                  {/* Tepadagi Panel: Yozuvlar va Ikonkalar qat'iy yonma-yon */}
+                  <div className="flex justify-between items-center text-xs font-bold text-navy-900 dark:text-gray-200">
+                    <span className="flex items-center gap-1">
+                      {k.label}
+                      <span className="text-[11px] font-medium text-accent">
+                        {k.qty}ta sotildi
+                      </span>
+                    </span>
+
+                    {/* To'langan va Nasiya donalari (Ikonkalar matn yonida mukammal joylashgan) */}
+                    <span className="font-mono text-[11px] flex items-center gap-2">
+                      {k.paidQty > 0 && (
+                        <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                          <CheckCheck size={11} className="shrink-0" />
+                          <span>{k.paidQty}</span>
+                        </span>
+                      )}
+                      {k.debtQty > 0 && (
+                        <span className="flex items-center gap-0.5 text-red-500 dark:text-red-400">
+                          <MinusSquare size={11} className="shrink-0" />
+                          <span>{k.debtQty}</span>
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Stacked Progress Bar Chizig'i */}
+                  <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-700/60 rounded-full overflow-hidden flex">
+                    {k.paidQty > 0 && (
+                      <div
+                        className="h-full bg-green-500 dark:bg-green-600 rounded-l-full transition-all duration-500"
+                        style={{ width: `${k.paidPct}%` }}
+                      />
+                    )}
+                    {k.debtQty > 0 && (
+                      <div
+                        className={`h-full bg-red-500 dark:bg-red-600 transition-all duration-500 ${k.paidQty === 0 ? "rounded-full" : "rounded-r-full"}`}
+                        style={{ width: `${k.debtPct}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -526,7 +683,7 @@ const Statistics = () => {
         {/* ── Kebab type revenue breakdown ──────────────────────── */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4">
           <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-3">
-            Daromad - shashlik turi bo'yicha
+            To'langan shashliklar turi buyicha taqsimot
           </h3>
           <div className="space-y-2.5">
             {KEBAB_CONFIG.map((k) => {
@@ -640,6 +797,146 @@ const Statistics = () => {
             </div>
           )}
         </div>
+        {/* ─── 🌟 UNIVERSAL FULL-PAGE MODAL: BUYURTMALAR RO'YXATI EKRA NUSTIDAN CHIQADI ─── */}
+        {/* ─── 🌟 UNIVERSAL FULL-PAGE MODAL: BUYURTMALAR RO'YXATI EKRA NUSTIDAN CHIQADI ─── */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[99999] bg-gray-900/60 dark:bg-black/70 backdrop-blur-md animate-in fade-in duration-200 flex flex-col justify-end sm:justify-center p-0 sm:p-4">
+            {/* Modal Oynasining Asosiy Korpusi */}
+            <div className="w-full  h-[92vh] sm:h-[85vh] bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+              {/* Modal Sarlavhasi va X Yopish Tugmasi Panel */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700/60 shrink-0 bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-3 h-3 rounded-full ${
+                      activeMetricFilter === "all"
+                        ? "bg-primary-500"
+                        : activeMetricFilter === "paid"
+                          ? "bg-orange-500"
+                          : activeMetricFilter === "debt"
+                            ? "bg-red-500"
+                            : "bg-green-500"
+                    }`}
+                  />
+                  <h3 className="text-base font-black text-navy-900 dark:text-white">
+                    {activeMetricFilter === "all"
+                      ? "Jami buyurtmalar ro'yxati"
+                      : activeMetricFilter === "paid"
+                        ? "To'langan buyurtmalar"
+                        : activeMetricFilter === "debt"
+                          ? "Nasiya buyurtmalar"
+                          : "Sof daromad aylanmasi"}
+                  </h3>
+                </div>
+
+                {/* 🌟 YANGILANDI: X tugmasi endi modal oynani 100% to'g'ri yopadi! */}
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full text-gray-500 dark:text-gray-300 transition-all active:scale-95 outline-none"
+                >
+                  <X size={18} className="stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Dinamik Ma'lumot Soni Hisoblagichi */}
+              <div
+                className={`px-5 py-2 border-b border-gray-100 dark:border-gray-700/40 shrink-0 ${
+                  activeMetricFilter === "all"
+                    ? "bg-primary-500"
+                    : activeMetricFilter === "paid"
+                      ? "bg-orange-500"
+                      : activeMetricFilter === "debt"
+                        ? "bg-red-500"
+                        : "bg-green-500"
+                }`}
+              >
+                <p className="text-xs font-bold ">
+                  Ushbu bo'limda jami {displayedOrders?.length || 0} ta buyurtma
+                  aniqlandi
+                </p>
+              </div>
+
+              {/* 📜 SKROLL BO'LADIGAN BUYURTMALAR RO'YXATI */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-none bg-gray-50/30 dark:bg-gray-900/10">
+                {!displayedOrders || displayedOrders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                    <p className="text-gray-400 text-sm font-semibold">
+                      Bu bo'limda buyurtmalar hozircha mavjud emas.
+                    </p>
+                  </div>
+                ) : (
+                  displayedOrders.map((order) => (
+                    <div
+                      key={order.id || order.identifier}
+                      className="p-4 rounded-2xl border border-gray-100 dark:border-gray-700/80 bg-white dark:bg-gray-800 flex flex-col gap-2.5 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      {/* <div className="flex items-center justify-end">
+                        <span
+                          className={`text-[10px] px-2.5 py-0.5 rounded-full font-black ${
+                            order.paid
+                              ? "bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400"
+                              : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                          }`}
+                        >
+                          {order.paid ? "To'langan" : "Nasiya"}
+                        </span>
+                      </div> */}
+
+                      <div className="flex justify-between items-center">
+                        <div className="max-w-[70%]">
+                          <h4 className="font-extrabold text-navy-900 dark:text-white text-sm truncate">
+                            {order.description}
+                          </h4>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5 tracking-wide">
+                            {getOrderSecondary(order)}
+                          </p>
+                          <p className="text-[10px] md:text-xs text-gray-400 dark:text-gray-500 font-bold mt-0.5 tracking-wide flex flex-wrap gap-0.5 items-center select-none">
+                            {/* Yaratilgan vaqt ikonkasi va matni */}
+                            <FileText
+                              size={11}
+                              className="shrink-0 text-gray-400 dark:text-gray-500"
+                            />
+                            <span>{formatOrderTime(order.createdAt)}</span>
+
+                            {/* Agar to'langan bo'lsa, yo'nalish o'qi va to'langan vaqt */}
+                            {order.paidAt && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-600 font-normal mx-0.5">
+                                  -&gt;
+                                </span>
+                                <SquarePlus
+                                  size={12}
+                                  className="text-emerald-600 dark:text-emerald-500 shrink-0"
+                                />
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  {formatOrderTime(order.paidAt)}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <span
+                            className={`text-[10px] text-center px-2 py-0.5 rounded-full font-black ${
+                              order.paid
+                                ? "bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400"
+                                : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                            }`}
+                          >
+                            {order.paid ? "To'langan" : "Nasiya"}
+                          </span>
+                          <span className="text-base font-black text-navy-900 dark:text-white tracking-tight">
+                            {formatCurrency(order.totalPrice)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ─────────────────────────────────────────────────────────────────── */}
       </div>
     </div>
   );

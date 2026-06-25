@@ -9,6 +9,7 @@ export const formatCurrency = (amount, currency = "UZS", locale = "uz-UZ") => {
   }).format(amount);
   return `${formatted} so'm`;
 };
+
 // Format revenue (short version, e.g., 1.2M, 3.4k)
 export const formatRevenue = (n) => {
   if (n >= 1000000) {

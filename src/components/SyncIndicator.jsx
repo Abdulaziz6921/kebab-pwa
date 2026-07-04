@@ -34,21 +34,33 @@ const SyncIndicator = () => {
   return (
     <>
       {/* Full Screen Loader */}
-      {isOnline && syncInProgress && (
-        <div className="fixed inset-0 z-[99999] bg-black/40 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center">
-            <div className="w-14 h-14 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+      {/* {isOnline && syncInProgress && (
+      
+      )} */}
+      <div className="fixed top-4 right-2 z-50">
+        <div className="bg-blue-500 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
+          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+              className="opacity-25"
+            />
+            <path
+              d="M22 12a10 10 0 00-10-10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
 
-            <h2 className="mt-5 text-lg font-semibold text-gray-800 dark:text-white">
-              Ma'lumotlar yuklanmoqda...
-            </h2>
-
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Iltimos kuting
-            </p>
-          </div>
+          <span className="text-sm font-medium">
+            Ma'lumotlar sinxronlanmoqda...
+          </span>
         </div>
-      )}
+      </div>
 
       {/* Notifications */}
       {notification && (

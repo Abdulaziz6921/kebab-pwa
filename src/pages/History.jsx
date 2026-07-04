@@ -232,30 +232,22 @@ const History = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [modalOrder, setModalOrder] = useState(null);
 
-  // ─── 🛠️ TIMEZONE-SAFE SANANI FORMATLASH (TAKRORLANISHSIZ) ───
+  const tashkentDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tashkent",
+  });
+
   const getLocalDateKey = (timestamp) => {
     if (!timestamp) return "";
-    let d =
+
+    const d =
       typeof timestamp === "object" && timestamp.seconds
         ? new Date(timestamp.seconds * 1000)
         : new Date(timestamp);
-    if (isNaN(d.getTime())) return "";
-    const year = d.toLocaleDateString("en-US", {
-      year: "numeric",
-      timeZone: "Asia/Tashkent",
-    });
-    const month = d.toLocaleDateString("en-US", {
-      month: "2-digit",
-      timeZone: "Asia/Tashkent",
-    });
-    const day = d.toLocaleDateString("en-US", {
-      day: "2-digit",
-      timeZone: "Asia/Tashkent",
-    });
-    return `${year}-${month}-${day}`;
+
+    return isNaN(d.getTime()) ? "" : tashkentDateFormatter.format(d);
   };
 
-  // 1. FILTERED ORDERS: Clean and raw database entries (No hidden paid/price hacks)
+  // FILTERED ORDERS
   const filteredOrders = useMemo(() => {
     const today = dayStart(Date.now());
     const limits = { today: 0, week: 6 * 86400000, month: 29 * 86400000 };
@@ -271,79 +263,79 @@ const History = () => {
     }));
   }, [orders, filter]);
 
-  // 2. DAY GROUPS: Group entries strictly by local date key to fix cross-day revenue bugs
+  // DAY GROUPS
+  const ordersByDate = useMemo(() => {
+    const map = new Map();
+
+    orders.forEach((order) => {
+      const key = getLocalDateKey(order.createdAt);
+
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+
+      map.get(key).push(order);
+    });
+
+    return map;
+  }, [orders]);
   const dayGroups = useMemo(() => {
+    const todayKey = getLocalDateKey(Date.now());
     const groups = groupOrdersByDay(filteredOrders);
 
     return groups.map((group) => {
-      // 🌟 STEP 1: Qat'iy vaqt mintaqasi bo'yicha joriy kun kalitini aniqlaymiz
-      const firstOrder = group.orders && group.orders[0];
+      const firstOrder = group.orders?.[0];
+
       const groupDateKey = firstOrder
         ? getLocalDateKey(firstOrder.createdAt)
-        : getLocalDateKey(Date.now());
+        : todayKey;
 
-      // 🌟 STEP 2: Asl 'orders' ichidan faqat va faqat SHU KUNNING obed xarajatlarini dynamic ajratamiz
-      const dayObedOrders = orders.filter(
-        (o) => o.isObed && getLocalDateKey(o.createdAt) === groupDateKey,
-      );
+      const allDayOrders = ordersByDate.get(groupDateKey) || [];
 
-      // Cash taken from register strictly for this exact day (e.g., 5,000 or 20,000)
+      const dayObedOrders = allDayOrders.filter((o) => o.isObed);
+
       const dayObedCash = dayObedOrders.reduce(
         (sum, o) => sum + (o.debtAmount || 0),
         0,
       );
 
-      // Kebab price eaten strictly by you on this exact day (e.g., 15,000 or 0)
-      const dayObedKebab = dayObedOrders.reduce((sum, o) => {
-        return sum + ((o.totalPrice || 0) - (o.debtAmount || 0));
+      const dayObedKebab = dayObedOrders.reduce(
+        (sum, o) => sum + ((o.totalPrice || 0) - (o.debtAmount || 0)),
+        0,
+      );
+
+      const regularPaidRevenue = allDayOrders.reduce((sum, o) => {
+        if (o.paid && !o.isObed) {
+          return sum + (o.totalPrice || 0);
+        }
+        return sum;
       }, 0);
 
-      // 🌟 STEP 3: Calculate base revenue strictly matching this local date key
-      // This completely isolates regular customer cash day by day and prevents leakage!
-      const regularPaidRevenue = orders
-        .filter(
-          (o) =>
-            o.paid &&
-            !o.isObed &&
-            getLocalDateKey(o.createdAt) === groupDateKey,
-        )
-        .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-
-      // Filter count metrics for this day's card Component
       const realDayOrders = group.orders.filter(
         (o) => !(o.isObed && (!o.items || o.items.length === 0)),
       );
 
-      // 🌟 STEP 4: STRICT MATHEMATICAL BALANCING RULE FOR MIXED vs CASH DAYS
-      // 23-June: 665,000 (regular paid cash) - 5,000 (lunch cash) = Exactly 660,000 so'm!
-      // 24-June: 645,000 (regular paid cash) - 5,000 (lunch cash) = Exactly 640,000 so'm!
       let finalRevenue = regularPaidRevenue - dayObedCash;
 
-      // If a kebab was eaten as lunch debt, it was never part of regularPaidRevenue.
-      // However, if the day is the current active mix input context, we apply balancing formula.
-      if (groupDateKey === getLocalDateKey(Date.now()) && dayObedKebab > 0) {
-        finalRevenue = finalRevenue - dayObedKebab;
+      if (groupDateKey === todayKey && dayObedKebab > 0) {
+        finalRevenue -= dayObedKebab;
       }
+
+      const paidCount = realDayOrders.filter((o) => o.paid && !o.isObed).length;
 
       return {
         ...group,
         revenue: finalRevenue,
-
-        // 🌟 MUTLOQ YAKUNIY FIX: realDayOrders o'rniga group.orders qo'yamiz!
-        // Shunda faqat 20,000 so'm kiritilgan kunlar ham ro'yxatda (Order List) MAJBURIY KO'RINADI!
         orders: group.orders,
-
-        total: realDayOrders.length, // Lekin jami buyurtmalar soniga baribir 0 ta deb qo'shilmaydi
+        total: realDayOrders.length,
         ordersCount: realDayOrders.length,
-        paidCount: realDayOrders.filter((o) => o.paid && !o.isObed).length,
-        unpaidCount:
-          realDayOrders.length -
-          realDayOrders.filter((o) => o.paid && !o.isObed).length,
+        paidCount,
+        unpaidCount: realDayOrders.length - paidCount,
       };
     });
-  }, [filteredOrders, orders]);
+  }, [filteredOrders, ordersByDate]);
 
-  // 3. SUMMARY:
+  // SUMMARY:
   const summary = useMemo(() => {
     const realOrders = filteredOrders.filter(
       (o) => o.quantity > 0 || !o.isObed,

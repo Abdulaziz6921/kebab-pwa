@@ -1,7 +1,7 @@
-import { orderDB, syncQueueDB, syncMetadataDB, SYNC_STATUS } from './indexeddb';
-import { orderApi, isFirebaseConfigured } from '../firebase';
-import { orderService } from './orderService';
-import { customerService } from './customerService';
+import { orderDB, syncQueueDB, syncMetadataDB, SYNC_STATUS } from "./indexeddb";
+import { orderApi, isFirebaseConfigured } from "../firebase";
+import { orderService } from "./orderService";
+import { customerService } from "./customerService";
 
 // Sync configuration
 const SYNC_CONFIG = {
@@ -31,21 +31,21 @@ export const syncService = {
    */
   init() {
     // Listen for online event
-    window.addEventListener('online', () => {
-      console.log('Connection restored, starting sync...');
+    window.addEventListener("online", () => {
+      console.log("Connection restored, starting sync...");
       this.syncAll();
     });
 
     // Initial sync if online
     if (navigator.onLine && isFirebaseConfigured()) {
-      console.log('App started online, performing initial sync...');
+      console.log("App started online, performing initial sync...");
       this.syncAll();
     }
 
     // Subscribe to realtime changes
     this.subscribeToRemoteChanges();
 
-    console.log('Sync service initialized');
+    console.log("Sync service initialized");
   },
 
   /**
@@ -54,7 +54,7 @@ export const syncService = {
   subscribe(callback) {
     syncListeners.push(callback);
     return () => {
-      syncListeners = syncListeners.filter(l => l !== callback);
+      syncListeners = syncListeners.filter((l) => l !== callback);
     };
   },
 
@@ -62,11 +62,11 @@ export const syncService = {
    * Notify listeners
    */
   notifyListeners(status) {
-    syncListeners.forEach(callback => {
+    syncListeners.forEach((callback) => {
       try {
         callback(status);
       } catch (e) {
-        console.error('Sync listener error:', e);
+        console.error("Sync listener error:", e);
       }
     });
   },
@@ -88,18 +88,18 @@ export const syncService = {
    */
   async syncAll() {
     if (syncInProgress) {
-      console.log('Sync already in progress');
-      return { success: false, reason: 'already_syncing' };
+      console.log("Sync already in progress");
+      return { success: false, reason: "already_syncing" };
     }
 
     if (!navigator.onLine) {
-      console.log('Offline, cannot sync');
-      return { success: false, reason: 'offline' };
+      console.log("Offline, cannot sync");
+      return { success: false, reason: "offline" };
     }
 
     if (!isFirebaseConfigured()) {
-      console.log('Firebase not configured, skipping sync');
-      return { success: false, reason: 'not_configured' };
+      console.log("Firebase not configured, skipping sync");
+      return { success: false, reason: "not_configured" };
     }
 
     syncInProgress = true;
@@ -115,27 +115,27 @@ export const syncService = {
 
     try {
       // Step 1: Pull remote changes
-      console.log('Pulling remote orders...');
-      try {
-        const pulled = await orderService.pullRemoteOrders();
-        results.pulled = pulled.length;
-      } catch (error) {
-        console.error('Pull failed:', error);
-        results.errors.push({ phase: 'pull', error: error.message });
-      }
+      // console.log("Pulling remote orders...");
+      // try {
+      //   const pulled = await orderService.pullRemoteOrders();
+      //   results.pulled = pulled.length;
+      // } catch (error) {
+      //   console.error("Pull failed:", error);
+      //   results.errors.push({ phase: "pull", error: error.message });
+      // }
 
       // Step 1b: Pull + push customers
-      console.log('Syncing customers...');
+      console.log("Syncing customers...");
       try {
         await customerService.pullFromFirestore();
         await customerService.syncAll();
       } catch (error) {
-        console.warn('Customer sync failed:', error.message);
-        results.errors.push({ phase: 'customers', error: error.message });
+        console.warn("Customer sync failed:", error.message);
+        results.errors.push({ phase: "customers", error: error.message });
       }
 
       // Step 2: Push local changes
-      console.log('Pushing local changes...');
+      console.log("Pushing local changes...");
       const unsyncedOrders = await orderDB.getUnsyncedOrders();
       const failedSyncOrders = await orderDB.getFailedSyncOrders();
       const toSync = [...unsyncedOrders, ...failedSyncOrders];
@@ -157,16 +157,19 @@ export const syncService = {
       }
 
       // Step 3: Process retry queue
-      console.log('Processing retry queue...');
-      const retryable = await syncQueueDB.getRetryableEntries(SYNC_CONFIG.MAX_RETRIES);
+      console.log("Processing retry queue...");
+      const retryable = await syncQueueDB.getRetryableEntries(
+        SYNC_CONFIG.MAX_RETRIES,
+      );
 
       for (const entry of retryable) {
         const delay = Math.min(
           SYNC_CONFIG.RETRY_DELAY_BASE * Math.pow(2, entry.retries),
-          SYNC_CONFIG.MAX_RETRY_DELAY
+          SYNC_CONFIG.MAX_RETRY_DELAY,
         );
 
-        const timeSinceLastAttempt = Date.now() - (entry.lastAttempt || entry.timestamp);
+        const timeSinceLastAttempt =
+          Date.now() - (entry.lastAttempt || entry.timestamp);
 
         if (timeSinceLastAttempt >= delay) {
           try {
@@ -177,7 +180,9 @@ export const syncService = {
             }
           } catch (error) {
             await syncQueueDB.incrementRetry(entry.id, error);
-            console.warn(`Retry ${entry.retries + 1} failed for order ${entry.orderId}`);
+            console.warn(
+              `Retry ${entry.retries + 1} failed for order ${entry.orderId}`,
+            );
           }
         }
       }
@@ -188,7 +193,7 @@ export const syncService = {
       }
       await syncMetadataDB.setLastSyncTime(Date.now());
 
-      console.log('Sync complete:', results);
+      console.log("Sync complete:", results);
       this.notifyListeners({
         inProgress: false,
         completedAt: Date.now(),
@@ -197,8 +202,8 @@ export const syncService = {
 
       return { success: true, results };
     } catch (error) {
-      console.error('Sync failed:', error);
-      results.errors.push({ phase: 'general', error: error.message });
+      console.error("Sync failed:", error);
+      results.errors.push({ phase: "general", error: error.message });
 
       this.notifyListeners({
         inProgress: false,
@@ -217,10 +222,10 @@ export const syncService = {
    */
   async syncOrder(orderId) {
     if (!navigator.onLine) {
-      throw new Error('Cannot sync while offline');
+      throw new Error("Cannot sync while offline");
     }
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
     return orderService.syncOrder(orderId);
   },
@@ -257,16 +262,16 @@ export const syncService = {
       const unsubscribe = orderApi.subscribe(async (change) => {
         const { type, order } = change;
 
-        if (type === 'added' && order) {
+        if (type === "added" && order) {
           const local = await orderDB.getOrder(order.id);
           if (!local) {
             await orderDB.saveOrder({
               ...order,
               synced: SYNC_STATUS.SYNCED,
             });
-            console.log('Synced new remote order:', order.identifier);
+            console.log("Synced new remote order:", order.identifier);
           }
-        } else if (type === 'modified' && order) {
+        } else if (type === "modified" && order) {
           const local = await orderDB.getOrder(order.id);
           if (local && local.synced === SYNC_STATUS.SYNCED) {
             if (order.updatedAt > local.updatedAt) {
@@ -274,21 +279,21 @@ export const syncService = {
                 ...order,
                 synced: SYNC_STATUS.SYNCED,
               });
-              console.log('Synced remote update:', order.identifier);
+              console.log("Synced remote update:", order.identifier);
             }
           }
-        } else if (type === 'removed') {
+        } else if (type === "removed") {
           const local = await orderDB.getOrder(order.id);
           if (local && local.synced === SYNC_STATUS.SYNCED) {
             await orderDB.deleteOrder(order.id);
-            console.log('Removed deleted remote order:', order.id);
+            console.log("Removed deleted remote order:", order.id);
           }
         }
       });
 
       return unsubscribe;
     } catch (error) {
-      console.warn('Failed to subscribe to remote changes:', error);
+      console.warn("Failed to subscribe to remote changes:", error);
       return () => {};
     }
   },
@@ -315,7 +320,7 @@ export const syncService = {
    */
   async reset() {
     await syncQueueDB.clearQueue();
-    console.log('Sync queue cleared');
+    console.log("Sync queue cleared");
   },
 };
 

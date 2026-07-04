@@ -74,29 +74,29 @@ export default function OrderDetailsModal({ order, onClose }) {
         <div className="space-y-3">
           <Row label="Kim / Joy" value={getOrderPrimary(order)} />
           {order.tavsif && <Row label="Tavsif" value={order.tavsif} />}
-
-          <Row
-            label="Kebab turi"
-            value={
-              order.items?.length
-                ? order.items.map((item) => item.kebabName).join(", ")
-                : KEBAB_LABELS[order.kebabType] || order.kebabType || "—"
-            }
-          />
-
-          <Row
-            label="Miqdor"
-            value={
-              order.items?.length
-                ? order.items.map((item) => `${item.quantity} ta`).join(", ")
-                : `${order.quantity || 1} ta`
-            }
-          />
-
-          {order.description && (
-            <Row label="Tafsilot" value={order.description} />
+          {order.customerName === "Man" && (
+            <Row label="Tavsif" value={order.description || "—"} />
           )}
-
+          {(order.customerName !== "Man" || order.items?.length > 0) && (
+            <Row
+              label="Kebab turi"
+              value={
+                order.items?.length
+                  ? order.items.map((item) => item.kebabName).join(", ")
+                  : KEBAB_LABELS[order.kebabType] || order.kebabType || "—"
+              }
+            />
+          )}
+          {(order.customerName !== "Man" || order.items?.length > 0) && (
+            <Row
+              label="Miqdor"
+              value={
+                order.items?.length
+                  ? order.items.map((item) => `${item.quantity} ta`).join(", ")
+                  : `${order.quantity || 1} ta`
+              }
+            />
+          )}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-gray-500">Jami</span>
@@ -105,7 +105,6 @@ export default function OrderDetailsModal({ order, onClose }) {
               </span>
             </div>
           </div>
-
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2">
             <Row
               label="Yaratilgan vaqt"

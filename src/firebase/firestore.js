@@ -13,8 +13,8 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
-} from 'firebase/firestore';
-import { getFirestoreDB, isFirebaseConfigured, COLLECTIONS } from './config';
+} from "firebase/firestore";
+import { getFirestoreDB, isFirebaseConfigured, COLLECTIONS } from "./config";
 
 // Helper to convert Firestore timestamp to JS timestamp
 const convertTimestamp = (timestamp) => {
@@ -62,12 +62,12 @@ export const orderApi = {
   // Get all orders
   async getAll() {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
     const ordersRef = collection(db, COLLECTIONS.ORDERS);
-    const q = query(ordersRef, orderBy('createdAt', 'desc'));
+    const q = query(ordersRef, orderBy("createdAt", "desc"));
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => orderFromFirestore(doc.id, doc.data()));
@@ -76,7 +76,7 @@ export const orderApi = {
   // Get order by ID
   async getById(id) {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
@@ -89,12 +89,12 @@ export const orderApi = {
   // Get order by identifier
   async getByIdentifier(identifier) {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
     const ordersRef = collection(db, COLLECTIONS.ORDERS);
-    const q = query(ordersRef, where('identifier', '==', identifier), limit(1));
+    const q = query(ordersRef, where("identifier", "==", identifier), limit(1));
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) return null;
@@ -106,7 +106,7 @@ export const orderApi = {
   // Create order
   async create(orderData) {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
@@ -115,7 +115,9 @@ export const orderApi = {
     // Check for duplicate
     const existing = await this.getByIdentifier(orderData.identifier);
     if (existing) {
-      throw new Error(`Order with identifier ${orderData.identifier} already exists`);
+      throw new Error(
+        `Order with identifier ${orderData.identifier} already exists`,
+      );
     }
 
     const firestoreData = orderToFirestore(orderData);
@@ -130,7 +132,7 @@ export const orderApi = {
   // Update order
   async update(id, updates) {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
@@ -149,7 +151,7 @@ export const orderApi = {
   // Delete order
   async delete(id) {
     if (!isFirebaseConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error("Firebase not configured");
     }
 
     const db = getFirestoreDB();
@@ -161,13 +163,13 @@ export const orderApi = {
   // Subscribe to realtime updates
   subscribe(callback) {
     if (!isFirebaseConfigured()) {
-      console.warn('Firebase not configured, skipping subscription');
+      console.warn("Firebase not configured, skipping subscription");
       return () => {};
     }
 
     const db = getFirestoreDB();
     const ordersRef = collection(db, COLLECTIONS.ORDERS);
-    const q = query(ordersRef, orderBy('createdAt', 'desc'));
+    const q = query(ordersRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -186,16 +188,16 @@ export const orderApi = {
 // Customer API — Firestore operations (cloud backup only)
 export const customerApi = {
   async getAll() {
-    if (!isFirebaseConfigured()) throw new Error('Firebase not configured');
+    if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
     const db = getFirestoreDB();
     const ref = collection(db, COLLECTIONS.CUSTOMERS);
     const snapshot = await getDocs(ref);
-    return snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    return snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
   },
 
   async getById(id) {
-    if (!isFirebaseConfigured()) throw new Error('Firebase not configured');
-    const db  = getFirestoreDB();
+    if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+    const db = getFirestoreDB();
     const ref = doc(db, COLLECTIONS.CUSTOMERS, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) return null;
@@ -203,29 +205,30 @@ export const customerApi = {
   },
 
   async create(customerData) {
-    if (!isFirebaseConfigured()) throw new Error('Firebase not configured');
-    const db  = getFirestoreDB();
+    if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+    const db = getFirestoreDB();
     const ref = doc(db, COLLECTIONS.CUSTOMERS, customerData.id);
     await setDoc(ref, {
-      name:        customerData.name,
+      name: customerData.name,
       is_favorite: customerData.is_favorite || false,
-      createdAt:   toFirestoreTimestamp(customerData.createdAt) || serverTimestamp(),
-      updatedAt:   serverTimestamp(),
+      createdAt:
+        toFirestoreTimestamp(customerData.createdAt) || serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
     return customerData;
   },
 
   async update(id, updates) {
-    if (!isFirebaseConfigured()) throw new Error('Firebase not configured');
-    const db  = getFirestoreDB();
+    if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+    const db = getFirestoreDB();
     const ref = doc(db, COLLECTIONS.CUSTOMERS, id);
     await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
     return { id, ...updates };
   },
 
   async delete(id) {
-    if (!isFirebaseConfigured()) throw new Error('Firebase not configured');
-    const db  = getFirestoreDB();
+    if (!isFirebaseConfigured()) throw new Error("Firebase not configured");
+    const db = getFirestoreDB();
     const ref = doc(db, COLLECTIONS.CUSTOMERS, id);
     await deleteDoc(ref);
     return true;

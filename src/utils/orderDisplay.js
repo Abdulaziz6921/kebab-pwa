@@ -21,7 +21,9 @@ export function getOrderPrimary(order) {
 
 export function getOrderSecondary(order) {
   if (!order) return "";
-
+  if (order.customerName === "Man") {
+    return order.description || "";
+  }
   // New multi-kebab orders
   if (order.items?.length) {
     return order.items

@@ -299,11 +299,6 @@ const History = () => {
         0,
       );
 
-      const dayObedKebab = dayObedOrders.reduce(
-        (sum, o) => sum + ((o.totalPrice || 0) - (o.debtAmount || 0)),
-        0,
-      );
-
       const regularPaidRevenue = allDayOrders.reduce((sum, o) => {
         if (o.paid && !o.isObed) {
           return sum + (o.totalPrice || 0);
@@ -315,12 +310,7 @@ const History = () => {
         (o) => !(o.isObed && (!o.items || o.items.length === 0)),
       );
 
-      let finalRevenue = regularPaidRevenue - dayObedCash;
-
-      if (groupDateKey === todayKey && dayObedKebab > 0) {
-        finalRevenue -= dayObedKebab;
-      }
-
+      const finalRevenue = regularPaidRevenue - dayObedCash;
       const paidCount = realDayOrders.filter((o) => o.paid && !o.isObed).length;
 
       return {

@@ -275,6 +275,15 @@ const Statistics = () => {
   }, [orders, period, today]);
 
   // ── Key metrics ───────────────────────────────────────────────────────────
+  const getKebabTotal = (order) => {
+    if (!order.items?.length) return 0;
+
+    return order.items.reduce(
+      (sum, item) =>
+        sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+      0,
+    );
+  };
   const metrics = useMemo(() => {
     // 1. Bugungi kunni tekshirish uchun helper
     const isToday = (date) => {
@@ -309,15 +318,15 @@ const Statistics = () => {
     // Pullarni (Summalarni) hisoblaymiz
 
     // G'aladondan olingan jami sof obed pullari summasi (Masalan: 20000)
-    const obedTotalSum = periodOrders
+    const obedExtraDebt = periodOrders
       .filter((o) => o.isObed)
       .reduce((s, o) => {
-        return s + (o.totalPrice || 0); // Jami 20,000 so'm (kabob 15k + naqd 5k)
+        return s + Math.max((o.totalPrice || 0) - getKebabTotal(o), 0);
       }, 0);
 
     // Naqd savdo puli (Revenue / Kassa): Haqiqiy to'langan puldan olingan sof naqd pul AYRILADI!
     const revenue =
-      paid.reduce((s, o) => s + (o.totalPrice || 0), 0) - obedTotalSum;
+      paid.reduce((s, o) => s + (o.totalPrice || 0), 0) - obedExtraDebt;
 
     const paidTotalSum = paid.reduce((s, o) => s + (o.totalPrice || 0), 0);
 
@@ -326,11 +335,10 @@ const Statistics = () => {
 
     // Jami buyurtmalar summasi: Faqat kaboblar pulini qo'shadi, obed pullarini qo'shmaydi
     const allOrdersTotalSum = cleanPeriodOrders.reduce((s, o) => {
-      // Agar bu "Man" (Obed) yozuvi bo'lsa, jami pul summasiga 0 so'm qo'shiladi (ya'ni qo'shilmaydi!)
       if (o.isObed) {
-        return s;
+        return s + getKebabTotal(o);
       }
-      // Faqat haqiqiy xaridorlar sotib olgan kaboblar puli qo'shiladi
+
       return s + (o.totalPrice || 0);
     }, 0);
 
@@ -393,12 +401,13 @@ const Statistics = () => {
       }, 0);
 
       const debtQty = periodOrders.reduce((sum, order) => {
-        if (order.paid || order.isObed || !order.items) return sum;
+        if (order.paid || !order.items) return sum;
+
         return (
           sum +
           order.items
             .filter((item) => item.kebabType === k.id)
-            .reduce((s, item) => s + (item.quantity || 0), 0)
+            .reduce((s, item) => s + Number(item.quantity || 0), 0)
         );
       }, 0);
 

@@ -48,6 +48,7 @@ export const COLLECTIONS = {
   MENU_ITEMS: "menuItems",
   RESTAURANTS: "restaurants",
   USERS: "users",
+  ARCHIVE: "archive",
 };
 
 initializeFirebase();

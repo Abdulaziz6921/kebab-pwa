@@ -11,4 +11,4 @@ export {
   auth,
 } from "./config";
 
-export { orderApi, customerApi } from "./firestore";
+export { orderApi, customerApi, archiveApi } from "./firestore";

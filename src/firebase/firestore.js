@@ -235,9 +235,24 @@ export const customerApi = {
   },
 };
 
+export const archiveApi = {
+  async save(order) {
+    if (!isFirebaseConfigured()) {
+      throw new Error("Firebase not configured");
+    }
+
+    const db = getFirestoreDB();
+
+    await setDoc(doc(db, COLLECTIONS.ARCHIVE, order.id), order);
+
+    return true;
+  },
+};
+
 export default {
   orderApi,
   customerApi,
+  archiveApi,
   COLLECTIONS,
   isFirebaseConfigured,
 };

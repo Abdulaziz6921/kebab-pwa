@@ -9,7 +9,14 @@
  *   2. Firestore sync      ← fire-and-forget, never awaited on critical path
  */
 import { orderDB, syncQueueDB, SYNC_STATUS } from "./indexeddb";
-import { orderApi, isFirebaseConfigured } from "../firebase";
+import {
+  orderApi,
+  isFirebaseConfigured,
+  archiveApi,
+  getFirestoreDB,
+  COLLECTIONS,
+} from "../firebase";
+import { writeBatch, doc } from "firebase/firestore";
 import { generateId, generateOrderNumber } from "../utils/helpers";
 
 // Fire-and-forget wrapper — NEVER throws to caller
@@ -255,6 +262,92 @@ export const orderService = {
     } catch (error) {
       console.error("Failed to pull remote orders:", error);
       throw error;
+    }
+  },
+
+  // ── Archive old orders (background) ───────────────────────────────────────
+  async archiveOldOrders(days = 30) {
+    if (!isFirebaseConfigured()) return;
+
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const remoteOrders = await orderApi.getAll();
+
+    // Orders to archive
+    const groups = {};
+
+    remoteOrders.forEach((order) => {
+      // Keep debts forever
+      if (order.isDebt) return;
+
+      // Keep "Man" orders forever
+      if (order.identifier === "Man") return;
+
+      // Archive only paid orders
+      if (!order.paid) return;
+
+      // Keep recent orders
+      if (order.createdAt >= cutoff) return;
+
+      const date = new Date(order.createdAt).toISOString().split("T")[0];
+
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(order);
+    });
+
+    const db = getFirestoreDB();
+
+    for (const [date, orders] of Object.entries(groups)) {
+      // Merge by kebab type
+      const merged = {};
+
+      orders.forEach((order) => {
+        (order.items || []).forEach((item) => {
+          if (!merged[item.kebabType]) {
+            merged[item.kebabType] = {
+              kebabType: item.kebabType,
+              kebabName: item.kebabName,
+              quantity: 0,
+              totalPrice: 0,
+              unitPrice: Number(item.unitPrice),
+            };
+          }
+
+          merged[item.kebabType].quantity += Number(item.quantity);
+
+          merged[item.kebabType].totalPrice +=
+            Number(item.quantity) * Number(item.unitPrice);
+        });
+      });
+
+      // Save ONE archive document for the day
+      await archiveApi.saveSummary({
+        id: date,
+        date,
+        archived: true,
+        items: Object.values(merged),
+        total: orders.length,
+        paid: orders.length,
+        unpaid: 0,
+        revenue: orders.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0),
+        createdAt: Date.now(),
+      });
+
+      // Delete archived orders
+      const batch = writeBatch(db);
+
+      orders.forEach((order) => {
+        batch.delete(doc(db, COLLECTIONS.ORDERS, order.id));
+      });
+
+      await batch.commit();
+
+      // Delete local copies
+      for (const order of orders) {
+        await orderDB.deleteOrder(order.id);
+      }
+
+      console.log(`Archived ${orders.length} orders for ${date}`);
     }
   },
 };

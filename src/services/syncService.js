@@ -2,6 +2,7 @@ import { orderDB, syncQueueDB, syncMetadataDB, SYNC_STATUS } from "./indexeddb";
 import { orderApi, isFirebaseConfigured } from "../firebase";
 import { orderService } from "./orderService";
 import { customerService } from "./customerService";
+import { archiveService } from "./archiveService";
 
 // Sync configuration
 const SYNC_CONFIG = {
@@ -186,7 +187,11 @@ export const syncService = {
           }
         }
       }
-
+      try {
+        await archiveService.archiveOldOrders();
+      } catch (e) {
+        console.error("Archive failed:", e);
+      }
       // Update metadata
       if (results.failed === 0) {
         await syncMetadataDB.setLastSuccessfulSync(Date.now());

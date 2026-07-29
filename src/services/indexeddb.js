@@ -169,12 +169,17 @@ export const orderDB = {
   },
 
   async saveOrder(order) {
-    const existing = await this.getOrderByIdentifier(order.identifier);
-    if (existing && existing.id !== order.id) {
-      throw new Error(
-        `Order with identifier ${order.identifier} already exists`,
-      );
+    // Skip duplicate check if identifier is missing
+    if (order.identifier) {
+      const existing = await this.getOrderByIdentifier(order.identifier);
+
+      if (existing && existing.id !== order.id) {
+        throw new Error(
+          `Order with identifier ${order.identifier} already exists`,
+        );
+      }
     }
+
     return dbOperations.put(STORES.ORDERS, order);
   },
 

@@ -105,7 +105,7 @@ function RevenueBarChart({ data, label }) {
             >
               {d.value > 0 && (
                 <span
-                  className={`font-semibold text-gray-500 leading-none whitespace-nowrap mb-0.5 tracking-tighter ${
+                  className={`font-semibold text-gray-400 leading-none whitespace-nowrap mb-0.5 tracking-tighter ${
                     data.length > 20
                       ? "text-[9px]"
                       : isLarge
@@ -129,10 +129,9 @@ function RevenueBarChart({ data, label }) {
                   minHeight: 2,
                 }}
               />
-
               {d.label && (
                 <span
-                  className={`text-center text-gray-400 leading-none mt-1 ${
+                  className={`text-center text-white leading-none mt-1 ${
                     data.length > 20 ? "text-[8px]" : "text-[10px]"
                   } ${isTdy ? "font-bold text-primary-500" : ""}`}
                 >
@@ -528,7 +527,7 @@ const Statistics = () => {
       }
 
       const d = new Date(dayTs);
-      const label = i % 5 === 0 ? `${d.getDate()}` : "";
+      const label = period === "month" ? `${d.getDate()}` : "";
       return { dayTs, value: Math.max(0, finalValue), label };
     });
   }, [orders, periodOrders, period, today]);
@@ -806,7 +805,7 @@ const Statistics = () => {
             </div>
           )}
         </div>
-        {/* ─── 🌟 UNIVERSAL FULL-PAGE MODAL: BUYURTMALAR RO'YXATI EKRA NUSTIDAN CHIQADI ─── */}
+
         {/* ─── 🌟 UNIVERSAL FULL-PAGE MODAL: BUYURTMALAR RO'YXATI EKRA NUSTIDAN CHIQADI ─── */}
         {isModalOpen && (
           <div className="fixed inset-0 z-[99999] bg-gray-900/60 dark:bg-black/70 backdrop-blur-md animate-in fade-in duration-200 flex flex-col justify-end sm:justify-center p-0 sm:p-4">
@@ -878,18 +877,6 @@ const Statistics = () => {
                       key={order.id || order.identifier}
                       className="p-4 rounded-2xl border border-gray-100 dark:border-gray-700/80 bg-white dark:bg-gray-800 flex flex-col gap-2.5 shadow-sm hover:shadow-md transition-shadow"
                     >
-                      {/* <div className="flex items-center justify-end">
-                        <span
-                          className={`text-[10px] px-2.5 py-0.5 rounded-full font-black ${
-                            order.paid
-                              ? "bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400"
-                              : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
-                          }`}
-                        >
-                          {order.paid ? "To'langan" : "Nasiya"}
-                        </span>
-                      </div> */}
-
                       <div className="flex justify-between items-center">
                         <div className="max-w-[70%]">
                           <h4 className="font-extrabold text-navy-900 dark:text-white text-sm truncate">

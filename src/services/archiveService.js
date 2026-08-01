@@ -23,6 +23,15 @@ export const archiveService = {
       // keep Man / Obed
       if (order.isObed) return;
 
+      // already archived summary -> skip
+      if (order.archived) return;
+
+      // manual summary order -> skip
+      if (order.identifier?.startsWith("archive-")) return;
+
+      // keep Man orders forever
+      if (order.identifier === "Man") return;
+
       // keep unpaid
       if (!order.paid) return;
 
@@ -62,7 +71,7 @@ export const archiveService = {
       const batch = writeBatch(db);
 
       Object.values(grouped).forEach((item) => {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${item.kebabType}`;
+        const id = `archive-${day}-${item.kebabType}`;
 
         const [year, month, date] = day.split("-");
         const formattedDate = `${date}.${month}.${year.slice(2)}`;

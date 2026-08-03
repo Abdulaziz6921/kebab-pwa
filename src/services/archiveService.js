@@ -10,7 +10,11 @@ export const archiveService = {
   async archiveOldOrders(days = 30) {
     const db = getFirestoreDB();
 
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const cutoffDate = new Date();
+    cutoffDate.setHours(0, 0, 0, 0);
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const cutoff = cutoffDate.getTime();
 
     const orders = await orderApi.getAll();
 
@@ -37,7 +41,9 @@ export const archiveService = {
 
       // keep recent
       if (order.createdAt >= cutoff) return;
-      const day = new Date(order.createdAt).toISOString().slice(0, 10);
+      const d = new Date(order.createdAt);
+
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
       if (!groups[day]) groups[day] = [];
 
